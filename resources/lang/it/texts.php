@@ -62,6 +62,7 @@ return array(
     'invoice_terms' => 'Termini della fattura',
     'save_as_default_terms' => 'Salva termini come predefiniti', /* Imposta termini come predefiniti */
     'download_pdf' => 'Scarica PDF',
+    'print_pdf' => 'Print invoice',
     'pay_now' => 'Paga Adesso', /* Paga Ora */
     'save_invoice' => 'Salva Fattura',
     'clone_invoice' => 'Duplica Fattura',

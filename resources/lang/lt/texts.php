@@ -62,6 +62,7 @@ return array(
     'invoice_terms' => 'Sąskaitos sąlygos',
     'save_as_default_terms' => 'Išsaugoti sąlygas kaip standratrines',
     'download_pdf' => 'Atsisiųsti PDF',
+    'print_pdf' => 'Print invoice',
     'pay_now' => 'Apmokėti dabar',
     'save_invoice' => 'Išsaugoti sąskaitą',
     'clone_invoice' => 'Kopijuoti sąskaitą',

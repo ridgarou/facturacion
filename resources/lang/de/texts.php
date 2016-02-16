@@ -62,6 +62,7 @@ return array(
     'invoice_terms' => 'Rechnungsbedingungen',
     'save_as_default_terms' => 'Als Standardbedingungen speichern',
     'download_pdf' => 'PDF herunterladen',
+    'print_pdf' => 'Print invoice',
     'pay_now' => 'Jetzt bezahlen',
     'save_invoice' => 'Rechnung speichern',
     'clone_invoice' => 'Rechnung duplizieren',

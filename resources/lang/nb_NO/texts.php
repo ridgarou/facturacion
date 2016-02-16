@@ -62,6 +62,7 @@ return array(
     'invoice_terms' => 'Vilkår for fakturaen',
     'save_as_default_terms' => 'Lagre som standard vilkår',
     'download_pdf' => 'Last ned PDF',
+    'print_pdf' => 'Print invoice',
     'pay_now' => 'Betal Nå',
     'save_invoice' => 'Lagre Faktura',
     'clone_invoice' => 'Kopier Faktura',

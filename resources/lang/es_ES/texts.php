@@ -61,6 +61,7 @@ return array(
     'invoice_terms' => 'Términos de facturación',
     'save_as_default_terms' => 'Guardar como términos por defecto',
     'download_pdf' => 'Descargar PDF',
+    'print_pdf' => 'Imprimir Factura',
     'pay_now' => 'Pagar Ahora',
     'save_invoice' => 'Guardar factura',
     'clone_invoice' => 'Clonar factura',

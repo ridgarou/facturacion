@@ -62,6 +62,7 @@ return array(
     'invoice_terms' => 'Conditions de facturation',
     'save_as_default_terms' => 'Sauvegarder comme conditions par défaut',
     'download_pdf' => 'Télécharger le PDF',
+    'print_pdf' => 'Print invoice',
     'pay_now' => 'Payer maintenant',
     'save_invoice' => 'Sauvegarder la facture',
     'clone_invoice' => 'Dupliquer la facture',

@@ -62,6 +62,7 @@ return array(
     'invoice_terms' => 'Factuur voorwaarden',
     'save_as_default_terms' => 'Opslaan als standaard voorwaarden',
     'download_pdf' => 'Download PDF',
+    'print_pdf' => 'Print invoice',
     'pay_now' => 'Betaal nu',
     'save_invoice' => 'Sla factuur op',
     'clone_invoice' => 'Kopieer factuur',
