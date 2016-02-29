@@ -31056,6 +31056,7 @@ NINJA.decodeJavascript = function(invoice, javascript)
         'quantityWidth': NINJA.quantityWidth(invoice),
         'taxWidth': NINJA.taxWidth(invoice),
         'clientDetails': NINJA.clientDetails(invoice),
+        'clientVatNumber': NINJA.clientVatNumber(invoice),
         'notesAndTerms': NINJA.notesAndTerms(invoice),
         'invoiceNotes': NINJA.invoiceNotes(invoice),
         'invoiceTerms': NINJA.invoiceTerms(invoice),
@@ -31389,7 +31390,8 @@ NINJA.accountAddress = function(invoice) {
         {text: account.address1},
         {text: account.address2},
         {text: cityStatePostal},
-        {text: account.country ? account.country.name : ''},
+		// **** Se quita el pais del membrete
+        //{text: account.country ? account.country.name : ''},
     ];
 
     if (invoice.is_pro) {
@@ -31480,20 +31482,32 @@ NINJA.clientDetails = function(invoice) {
 
     data = [
         {text:clientName || ' ', style: ['clientName']},
-        {text:client.id_number},
-        {text:client.vat_number},
+		// **** Se quita el NIF del cliente del membrete
+        //{text:client.id_number},
+        //{text:client.vat_number},
         {text:client.address1},
         {text:client.address2},
         {text:cityStatePostal},
-        {text:client.country ? client.country.name : ''}
+		// **** Se quita el pais del membrete
+        //{text:client.country ? client.country.name : ''},
 		// **** Se quita la direccion de correo y el fax del membrete
-		//,
         //{text:clientEmail},
         //{text: client.custom_value1 && !custom1InPattern ? account.custom_client_label1 + ' ' + client.custom_value1 : false},
         //{text: client.custom_value2 && !custom2InPattern ? account.custom_client_label2 + ' ' + client.custom_value2 : false}
     ];
 
     return NINJA.prepareDataList(data, 'clientDetails');
+}
+
+NINJA.clientVatNumber = function(invoice) {
+	var client = invoice.client;
+    var data = [
+    [
+        {text: 'NIF/CIF de Cliente:   ', style: ['invoiceNumberLabel']},
+        {text: client.vat_number}
+    ]
+    ];
+    return NINJA.prepareDataPairs(data, 'clientVatNumber');
 }
 
 NINJA.getPrimaryColor = function(defaultColor) {
