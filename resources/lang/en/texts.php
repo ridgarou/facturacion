@@ -57,6 +57,7 @@ $LANG = array(
     'invoice_terms' => 'Invoice Terms',
     'save_as_default_terms' => 'Save as default terms',
     'download_pdf' => 'Download PDF',
+    'print_pdf' => 'Print invoice',
     'pay_now' => 'Pay Now',
     'save_invoice' => 'Save Invoice',
     'clone_invoice' => 'Clone Invoice',

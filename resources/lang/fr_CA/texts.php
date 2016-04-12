@@ -61,6 +61,7 @@ return array(
     'note_to_client' => 'Commentaire pour le client',
     'invoice_terms' => 'Conditions de facturation',
     'save_as_default_terms' => 'Sauvegarder comme conditions par défaut',
+    'print_pdf' => 'Print invoice',
     'download_pdf' => 'PDF',
     'pay_now' => 'Payer maintenant',
     'save_invoice' => 'Sauvegarder la facture',

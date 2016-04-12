@@ -436,7 +436,8 @@
 			{!! Former::select('invoice_design_id')->style('display:inline;width:150px;background-color:white !important')->raw()->fromQuery($invoiceDesigns, 'name', 'id')->data_bind("value: invoice_design_id") !!}
 		@endif
 
-		{!! Button::primary(trans('texts.download_pdf'))->withAttributes(array('onclick' => 'onDownloadClick()'))->appendIcon(Icon::create('download-alt')) !!}
+		{!! Button::primary(trans('texts.print_pdf'))->withAttributes(array('onclick' => 'onPrintClick()'))->appendIcon(Icon::create('print')) !!}
+                {!! Button::primary(trans('texts.download_pdf'))->withAttributes(array('onclick' => 'onDownloadClick()'))->appendIcon(Icon::create('download-alt')) !!}
 
         @if ($invoice->isClientTrashed())
             <!-- do nothing -->
@@ -1026,13 +1027,23 @@
     }
 
 	function onDownloadClick() {
-		trackEvent('/activity', '/download_pdf');
-		var invoice = createInvoiceModel();
-        var design  = getDesignJavascript();
-		if (!design) return;
-		var doc = generatePDF(invoice, design, true);
-        var type = invoice.is_quote ? '{{ trans('texts.'.ENTITY_QUOTE) }}' : '{{ trans('texts.'.ENTITY_INVOICE) }}';
-		doc.save(type +'-' + $('#invoice_number').val() + '.pdf');
+            trackEvent('/activity', '/download_pdf');
+            var invoice = createInvoiceModel();
+            var design  = getDesignJavascript();
+            if (!design) return;
+            var doc = generatePDF(invoice, design, true);
+            var type = invoice.is_quote ? '{{ trans('texts.'.ENTITY_QUOTE) }}' : '{{ trans('texts.'.ENTITY_INVOICE) }}';
+            doc.save(type +'-' + $('#invoice_number').val() + '.pdf');
+	}
+        
+	function onPrintClick() {
+            trackEvent('/activity', '/download_pdf');
+            var invoice = createInvoiceModel();
+            var design  = getDesignJavascript();
+            if (!design) return;
+            var doc = generatePDF(invoice, design, true);
+            var type = invoice.is_quote ? '{{ trans('texts.'.ENTITY_QUOTE) }}' : '{{ trans('texts.'.ENTITY_INVOICE) }}';
+            doc.print();
 	}
 
 	function onEmailClick() {

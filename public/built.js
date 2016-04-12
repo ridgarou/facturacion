@@ -30498,11 +30498,12 @@ function calculateAmounts(invoice) {
     var taxRate = 0;
     var taxName = '';
 
-    if (item.product_key) {
-        invoice.has_product_key = true;
-    } else if (invoice.invoice_items.length == 1 && !item.qty) {
-        invoice.has_product_key = true;
-    }
+	// NOTA: Comentado para ocultar la primera columna
+    //if (item.product_key) {
+    //    invoice.has_product_key = true;
+    //} else if (invoice.invoice_items.length == 1 && !item.qty) {
+    //    invoice.has_product_key = true;
+    //}
 
     // the object structure differs if it's read from the db or created by knockoutJS
     if (item.tax && parseFloat(item.tax.rate)) {
@@ -31140,6 +31141,7 @@ NINJA.decodeJavascript = function(invoice, javascript)
         'quantityWidth': NINJA.quantityWidth(invoice),
         'taxWidth': NINJA.taxWidth(invoice),
         'clientDetails': NINJA.clientDetails(invoice),
+        'clientVatNumber': NINJA.clientVatNumber(invoice),
         'notesAndTerms': NINJA.notesAndTerms(invoice),
         'invoiceNotes': NINJA.invoiceNotes(invoice),
         'invoiceTerms': NINJA.invoiceTerms(invoice),
@@ -31277,11 +31279,15 @@ NINJA.invoiceTerms = function(invoice)
 
 NINJA.invoiceColumns = function(invoice)
 {
+    var hideQuantity = invoice.account.hide_quantity == '1';
+	// Se oculta la columna de impuestos en la factura
+    var showItemTaxes = false; //invoice.account.show_item_taxes == '1';
     var account = invoice.account;
+    ///var columns = ["7%", "*"];
     var columns = [];
 
     if (invoice.has_product_key) {
-        columns.push("15%");
+        columns.push("7%");
     }
 
     columns.push("*")
@@ -31294,14 +31300,16 @@ NINJA.invoiceColumns = function(invoice)
     }
 
     var count = 3;
-    if (account.hide_quantity == '1') {
+    if (hideQuantity == '1') {
+
         count--;
     }
-    if (account.show_item_taxes == '1') {
+    if (showItemTaxes == '1') {
+
         count++;
     }
     for (var i=0; i<count; i++) {
-        columns.push("14%");
+        columns.push("12%");
     }
 
     return columns;
@@ -31318,12 +31326,15 @@ NINJA.invoiceFooter = function(invoice)
 
 NINJA.quantityWidth = function(invoice)
 {
-    return invoice.account.hide_quantity == '1' ? '' : '"14%", ';
+	var hideQuantity = invoice.account.hide_quantity == '1';
+    return hideQuantity ? '' : '"12%", ';
 }
 
 NINJA.taxWidth = function(invoice)
 {
-    return invoice.account.show_item_taxes == '1' ? '"14%", ' : '';
+	// Se oculta la columna de impuestos en la factura
+	var showItemTaxes = false; //invoice.account.show_item_taxes == '1';
+    return showItemTaxes ? '"12%", ' : '';
 }
 
 NINJA.invoiceLines = function(invoice) {
@@ -31331,7 +31342,8 @@ NINJA.invoiceLines = function(invoice) {
     var total = 0;
     var shownItem = false;
     var hideQuantity = invoice.account.hide_quantity == '1';
-    var showItemTaxes = invoice.account.show_item_taxes == '1';
+	// Se oculta la columna de impuestos en la factura
+    var showItemTaxes = false; //invoice.account.show_item_taxes == '1';
 
     var grid = [[]];
 
@@ -31519,7 +31531,8 @@ NINJA.accountAddress = function(invoice) {
         {text: account.address1},
         {text: account.address2},
         {text: cityStatePostal},
-        {text: account.country ? account.country.name : ''},
+		// **** Se quita el pais del membrete
+        //{text: account.country ? account.country.name : ''},
     ];
 
     if (invoice.is_pro) {
@@ -31610,18 +31623,32 @@ NINJA.clientDetails = function(invoice) {
 
     data = [
         {text:clientName || ' ', style: ['clientName']},
-        {text:client.id_number},
-        {text:client.vat_number},
+		// **** Se quita el NIF del cliente del membrete
+        //{text:client.id_number},
+        //{text:client.vat_number},
         {text:client.address1},
         {text:client.address2},
         {text:cityStatePostal},
-        {text:client.country ? client.country.name : ''},
-        {text:clientEmail},
-        {text: client.custom_value1 && !custom1InPattern ? account.custom_client_label1 + ' ' + client.custom_value1 : false},
-        {text: client.custom_value2 && !custom2InPattern ? account.custom_client_label2 + ' ' + client.custom_value2 : false}
+		// **** Se quita el pais del membrete
+        //{text:client.country ? client.country.name : ''},
+		// **** Se quita la direccion de correo y el fax del membrete
+        //{text:clientEmail},
+        //{text: client.custom_value1 && !custom1InPattern ? account.custom_client_label1 + ' ' + client.custom_value1 : false},
+        //{text: client.custom_value2 && !custom2InPattern ? account.custom_client_label2 + ' ' + client.custom_value2 : false}
     ];
 
     return NINJA.prepareDataList(data, 'clientDetails');
+}
+
+NINJA.clientVatNumber = function(invoice) {
+	var client = invoice.client;
+    var data = [
+    [
+        {text: 'NIF/CIF de Cliente:   ', style: ['invoiceNumberLabel']},
+        {text: client.vat_number}
+    ]
+    ];
+    return NINJA.prepareDataPairs(data, 'clientVatNumber');
 }
 
 NINJA.getPrimaryColor = function(defaultColor) {
