@@ -31290,11 +31290,12 @@ NINJA.invoiceColumns = function(invoice)
         columns.push("7%");
     }
 
+    if (invoice.is_pro && account.custom_invoice_item_label1) {
+        columns.push("12%");
+    }
+
     columns.push("*")
 
-    if (invoice.is_pro && account.custom_invoice_item_label1) {
-        columns.push("10%");
-    }
     if (invoice.is_pro && account.custom_invoice_item_label2) {
         columns.push("10%");
     }
@@ -31351,11 +31352,12 @@ NINJA.invoiceLines = function(invoice) {
         grid[0].push({text: invoiceLabels.item, style: ['tableHeader', 'itemTableHeader']});
     }
 
-    grid[0].push({text: invoiceLabels.description, style: ['tableHeader', 'descriptionTableHeader']});
-
     if (invoice.is_pro && account.custom_invoice_item_label1) {
         grid[0].push({text: account.custom_invoice_item_label1, style: ['tableHeader', 'custom1TableHeader']});
     }
+
+    grid[0].push({text: invoiceLabels.description, style: ['tableHeader', 'descriptionTableHeader']});
+
     if (invoice.is_pro && account.custom_invoice_item_label2) {
         grid[0].push({text: account.custom_invoice_item_label2, style: ['tableHeader', 'custom2TableHeader']});
     }
@@ -31410,10 +31412,10 @@ NINJA.invoiceLines = function(invoice) {
         if (invoice.has_product_key) {
             row.push({style:["productKey", rowStyle], text:productKey || ' '}); // product key can be blank when selecting from a datalist
         }
-        row.push({style:["notes", rowStyle], stack:[{text:notes || ' '}]}); 
         if (invoice.is_pro && account.custom_invoice_item_label1) {
             row.push({style:["customValue1", rowStyle], text:item.custom_value1 || ' '});
         }
+        row.push({style:["notes", rowStyle], stack:[{text:notes || ' '}]}); 
         if (invoice.is_pro && account.custom_invoice_item_label2) {
             row.push({style:["customValue2", rowStyle], text:item.custom_value2 || ' '});
         }
