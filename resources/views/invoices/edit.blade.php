@@ -17,7 +17,7 @@
         label.control-label[for=invoice_number] {
             font-weight: normal !important;
         }
-        
+
         select.tax-select {
             width: 50%;
             float: left;
@@ -79,7 +79,7 @@
                                 &nbsp;&nbsp;<div class="label label-danger">{{ trans('texts.deleted') }}</div>
                             @endif
                         </h4>
-                        
+
                         @can('view', $invoice->client)
                             @can('edit', $invoice->client)
                                 <a id="editClientLink" class="pointer" data-bind="click: $root.showClientForm">{{ trans('texts.edit_client') }}</a> |
@@ -90,7 +90,7 @@
 				</div>
 				<div style="display:none">
     		@endif
-            
+
             {!! Former::select('client')->addOption('', '')->data_bind("dropdown: client")->addClass('client-input')->addGroupClass('client_select closer-row') !!}
 
 			<div class="form-group" style="margin-bottom: 8px">
@@ -419,7 +419,7 @@
                             ->options($taxRateOptions)
                             ->addClass('tax-select')
                             ->data_bind('value: tax1')
-                            ->raw() !!}                    
+                            ->raw() !!}
                     <input type="text" name="tax_name1" data-bind="value: tax_name1" style="display:none">
                     <input type="text" name="tax_rate1" data-bind="value: tax_rate1" style="display:none">
                     {!! Former::select('')
@@ -427,7 +427,7 @@
                             ->options($taxRateOptions)
                             ->addClass('tax-select')
                             ->data_bind('value: tax2')
-                            ->raw() !!}                    
+                            ->raw() !!}
                     <input type="text" name="tax_name2" data-bind="value: tax_name2" style="display:none">
                     <input type="text" name="tax_rate2" data-bind="value: tax_rate2" style="display:none">
                 </td>
@@ -570,7 +570,7 @@
                     {!! Former::text('client[work_phone]')
                             ->label('work_phone')
                             ->data_bind("value: work_phone, valueUpdate: 'afterkeydown'") !!}
-				
+
                 </span>
 
                 @if (Auth::user()->hasFeature(FEATURE_INVOICE_SETTINGS))
@@ -757,7 +757,7 @@
     var $clientSelect = $('select#client');
     var invoiceDesigns = {!! $invoiceDesigns !!};
     var invoiceFonts = {!! $invoiceFonts !!};
-    
+
 	$(function() {
         // create client dictionary
         for (var i=0; i<clients.length; i++) {
@@ -825,7 +825,7 @@
                 model.invoice().has_tasks(true);
             @endif
 
-            if(model.invoice().expenses() && !model.invoice().public_id()){
+            if(model.invoice().expenses().length && !model.invoice().public_id()){
                 model.expense_currency_id({{ isset($expenseCurrencyId) ? $expenseCurrencyId : 0 }});
 
                 // move the blank invoice line item to the end
@@ -845,7 +845,7 @@
             }
 
         @endif
-        
+
         // display blank instead of '0'
         if (!NINJA.parseFloat(model.invoice().discount())) model.invoice().discount('');
         if (!NINJA.parseFloat(model.invoice().partial())) model.invoice().partial('');
@@ -967,55 +967,70 @@
         @endif
 
         applyComboboxListeners();
-        
+
         @if (Auth::user()->account->hasFeature(FEATURE_DOCUMENTS))
         $('.main-form').submit(function(){
             if($('#document-upload .dropzone .fallback input').val())$(this).attr('enctype', 'multipart/form-data')
             else $(this).removeAttr('enctype')
         })
-        
-        // Initialize document upload
-        dropzone = new Dropzone('#document-upload .dropzone', {
-            url:{!! json_encode(url('document')) !!},
-            params:{
-                _token:"{{ Session::getToken() }}"
-            },
-            acceptedFiles:{!! json_encode(implode(',',\App\Models\Document::$allowedMimes)) !!},
-            addRemoveLinks:true,
-            @foreach(trans('texts.dropzone') as $key=>$text)
-            "dict{{strval($key)}}":"{{strval($text)}}",
-            @endforeach
-            maxFileSize:{{floatval(MAX_DOCUMENT_SIZE/1000)}},
-        });
-        if(dropzone instanceof Dropzone){
-            dropzone.on("addedfile",handleDocumentAdded);
-            dropzone.on("removedfile",handleDocumentRemoved);
-            dropzone.on("success",handleDocumentUploaded);
-            for (var i=0; i<model.invoice().documents().length; i++) {
-                var document = model.invoice().documents()[i];
-                var mockFile = {
-                    name:document.name(),
-                    size:document.size(),
-                    type:document.type(),
-                    public_id:document.public_id(),
-                    status:Dropzone.SUCCESS,
-                    accepted:true,
-                    url:document.preview_url()||document.url(),
-                    mock:true,
-                    index:i
-                };
 
-                dropzone.emit('addedfile', mockFile);
-                dropzone.emit('complete', mockFile);
-                if(document.preview_url()){
-                    dropzone.emit('thumbnail', mockFile, document.preview_url()||document.url());
-                }
-                else if(document.type()=='jpeg' || document.type()=='png' || document.type()=='svg'){
-                    dropzone.emit('thumbnail', mockFile, document.url());
-                }
-                dropzone.files.push(mockFile);
+        // Initialize document upload
+        window.dropzone = false;
+        $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+            if (window.dropzone) {
+                return;
             }
-        }
+
+            var target = $(e.target).attr('href') // activated tab
+            if (target != '#attached-documents') {
+                return;
+            }
+
+            window.dropzone = new Dropzone('#document-upload .dropzone', {
+                url:{!! json_encode(url('document')) !!},
+                params:{
+                    _token:"{{ Session::getToken() }}"
+                },
+                acceptedFiles:{!! json_encode(implode(',',\App\Models\Document::$allowedMimes)) !!},
+                addRemoveLinks:true,
+                dictRemoveFileConfirmation:"{{trans('texts.are_you_sure')}}",
+                @foreach(trans('texts.dropzone') as $key=>$text)
+    	            "dict{{strval($key)}}":"{{strval($text)}}",
+                @endforeach
+                maxFilesize:{{floatval(MAX_DOCUMENT_SIZE/1000)}},
+            });
+            if(dropzone instanceof Dropzone){
+                dropzone.on("addedfile",handleDocumentAdded);
+                dropzone.on("removedfile",handleDocumentRemoved);
+                dropzone.on("success",handleDocumentUploaded);
+                dropzone.on("canceled",handleDocumentCanceled);
+                dropzone.on("error",handleDocumentError);
+                for (var i=0; i<model.invoice().documents().length; i++) {
+                    var document = model.invoice().documents()[i];
+                    var mockFile = {
+                        name:document.name(),
+                        size:document.size(),
+                        type:document.type(),
+                        public_id:document.public_id(),
+                        status:Dropzone.SUCCESS,
+                        accepted:true,
+                        url:document.url(),
+                        mock:true,
+                        index:i
+                    };
+
+                    dropzone.emit('addedfile', mockFile);
+                    dropzone.emit('complete', mockFile);
+                    if(document.preview_url()){
+                        dropzone.emit('thumbnail', mockFile, document.preview_url());
+                    }
+                    else if(document.type()=='jpeg' || document.type()=='png' || document.type()=='svg'){
+                        dropzone.emit('thumbnail', mockFile, document.url());
+                    }
+                    dropzone.files.push(mockFile);
+                }
+            }
+        });
         @endif
 	});
 
@@ -1185,7 +1200,7 @@
 				submitAction('');
 			}
 		} else {
-            preparePdfData('');
+            submitAction('');
 		}
 	}
 
@@ -1221,6 +1236,10 @@
 	}
 
     function onFormSubmit(event) {
+        if (window.countUploadingDocuments > 0) {
+            return false;
+        }
+
         if (!isSaveValid()) {
             model.showClientForm();
             return false;
@@ -1235,7 +1254,7 @@
         }
 
         onPartialChange(true);
-        
+
         return true;
     }
 
@@ -1390,27 +1409,50 @@
         number = number.replace('{$custom2}', client.custom_value2 ? client.custom_value1 : '');
         model.invoice().invoice_number(number);
     }
-        
+
+    window.countUploadingDocuments = 0;
     @if ($account->hasFeature(FEATURE_DOCUMENTS))
     function handleDocumentAdded(file){
+        // open document when clicked
+        if (file.url) {
+            file.previewElement.addEventListener("click", function() {
+                window.open(file.url, '_blank');
+            });
+        }
         if(file.mock)return;
         file.index = model.invoice().documents().length;
         model.invoice().addDocument({name:file.name, size:file.size, type:file.type});
+        window.countUploadingDocuments++;
     }
-        
+
     function handleDocumentRemoved(file){
         model.invoice().removeDocument(file.public_id);
         refreshPDF(true);
+        $.ajax({
+            url: '{{ '/documents/' }}' + file.public_id,
+            type: 'DELETE',
+            success: function(result) {
+                // Do something with the result
+            }
+        });
     }
-        
+
     function handleDocumentUploaded(file, response){
         file.public_id = response.document.public_id
         model.invoice().documents()[file.index].update(response.document);
+        window.countUploadingDocuments--;
         refreshPDF(true);
-        
         if(response.document.preview_url){
             dropzone.emit('thumbnail', file, response.document.preview_url);
         }
+    }
+
+    function handleDocumentCanceled() {
+        window.countUploadingDocuments--;
+    }
+
+    function handleDocumentError() {
+        window.countUploadingDocuments--;
     }
     @endif
 

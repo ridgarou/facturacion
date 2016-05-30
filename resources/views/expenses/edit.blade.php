@@ -14,8 +14,11 @@
 @stop
 
 @section('content')
-	
-	{!! Former::open($url)->addClass('warn-on-exit main-form')->method($method) !!}
+
+    {!! Former::open($url)
+        ->addClass('warn-on-exit main-form')
+        ->onsubmit('return onFormSubmit(event)')
+        ->method($method) !!}
     <div style="display:none">
         {!! Former::text('action') !!}
     </div>
@@ -154,6 +157,15 @@
             clientMap[client.public_id] = client;
         }
 
+        function onFormSubmit(event) {
+            if (window.countUploadingDocuments > 0) {
+                alert("{!! trans('texts.wait_for_upload') !!}");
+                return false;
+            }
+
+            return true;
+        }
+
         function onClientChange() {
             var clientId = $('select#client_id').val();
             var client = clientMap[clientId];
@@ -216,13 +228,13 @@
             @else
                 $('#amount').focus();
             @endif
-            
+
             @if (Auth::user()->account->isPro())
             $('.main-form').submit(function(){
                 if($('#document-upload .fallback input').val())$(this).attr('enctype', 'multipart/form-data')
                 else $(this).removeAttr('enctype')
             })
-            
+
             // Initialize document upload
             dropzone = new Dropzone('#document-upload', {
                 url:{!! json_encode(url('document')) !!},
@@ -231,15 +243,18 @@
                 },
                 acceptedFiles:{!! json_encode(implode(',',\App\Models\Document::$allowedMimes)) !!},
                 addRemoveLinks:true,
+                dictRemoveFileConfirmation:"{{trans('texts.are_you_sure')}}",
                 @foreach(trans('texts.dropzone') as $key=>$text)
-                "dict{{strval($key)}}":"{{strval($text)}}",
+    	            "dict{{strval($key)}}":"{{strval($text)}}",
                 @endforeach
-                maxFileSize:{{floatval(MAX_DOCUMENT_SIZE/1000)}},
+                maxFilesize:{{floatval(MAX_DOCUMENT_SIZE/1000)}},
             });
             if(dropzone instanceof Dropzone){
                 dropzone.on("addedfile",handleDocumentAdded);
                 dropzone.on("removedfile",handleDocumentRemoved);
                 dropzone.on("success",handleDocumentUploaded);
+                dropzone.on("canceled",handleDocumentCanceled);
+                dropzone.on("error",handleDocumentError);
                 for (var i=0; i<model.documents().length; i++) {
                     var document = model.documents()[i];
                     var mockFile = {
@@ -249,7 +264,7 @@
                         public_id:document.public_id(),
                         status:Dropzone.SUCCESS,
                         accepted:true,
-                        url:document.preview_url()||document.url(),
+                        url:document.url(),
                         mock:true,
                         index:i
                     };
@@ -286,7 +301,7 @@
                     }
                 }
             }
-            
+
             if (data) {
                 ko.mapping.fromJS(data, self.mapping, this);
             }
@@ -327,11 +342,11 @@
                 }
                 var expenseCurrencyId = self.expense_currency_id() || self.account_currency_id();
                 var invoiceCurrencyId = self.invoice_currency_id() || self.account_currency_id();
-                return expenseCurrencyId != invoiceCurrencyId 
+                return expenseCurrencyId != invoiceCurrencyId
                     || invoiceCurrencyId != self.account_currency_id()
                     || expenseCurrencyId != self.account_currency_id();
             })
-            
+
             self.addDocument = function() {
                 var documentModel = new DocumentModel();
                 self.documents.push(documentModel);
@@ -359,27 +374,50 @@
 
             if (data) {
                 self.update(data);
-            }    
+            }
         }
-        
+
+        window.countUploadingDocuments = 0;
         @if (Auth::user()->account->hasFeature(FEATURE_DOCUMENTS))
         function handleDocumentAdded(file){
+            // open document when clicked
+            if (file.url) {
+                file.previewElement.addEventListener("click", function() {
+                    window.open(file.url, '_blank');
+                });
+            }
             if(file.mock)return;
             file.index = model.documents().length;
             model.addDocument({name:file.name, size:file.size, type:file.type});
+            window.countUploadingDocuments++;
         }
 
         function handleDocumentRemoved(file){
             model.removeDocument(file.public_id);
+            $.ajax({
+                url: '{{ '/documents/' }}' + file.public_id,
+                type: 'DELETE',
+                success: function(result) {
+                    // Do something with the result
+                }
+            });
         }
 
         function handleDocumentUploaded(file, response){
             file.public_id = response.document.public_id
             model.documents()[file.index].update(response.document);
-
+            window.countUploadingDocuments--;
             if(response.document.preview_url){
                 dropzone.emit('thumbnail', file, response.document.preview_url);
             }
+        }
+
+        function handleDocumentCanceled() {
+            window.countUploadingDocuments--;
+        }
+
+        function handleDocumentError() {
+            window.countUploadingDocuments--;
         }
         @endif
     </script>
