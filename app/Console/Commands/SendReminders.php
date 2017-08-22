@@ -1,23 +1,51 @@
-<?php namespace App\Console\Commands;
+<?php
 
-use DB;
-use DateTime;
+namespace App\Console\Commands;
+
+use App\Models\Invoice;
+use App\Ninja\Mailers\ContactMailer as Mailer;
+use App\Ninja\Repositories\AccountRepository;
+use App\Ninja\Repositories\InvoiceRepository;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Input\InputOption;
-use Symfony\Component\Console\Input\InputArgument;
-use App\Models\Account;
-use App\Ninja\Mailers\ContactMailer as Mailer;
-use App\Ninja\Repositories\accountRepository;
-use App\Ninja\Repositories\InvoiceRepository;
 
+/**
+ * Class SendReminders.
+ */
 class SendReminders extends Command
 {
+    /**
+     * @var string
+     */
     protected $name = 'ninja:send-reminders';
+
+    /**
+     * @var string
+     */
     protected $description = 'Send reminder emails';
+
+    /**
+     * @var Mailer
+     */
     protected $mailer;
+
+    /**
+     * @var InvoiceRepository
+     */
     protected $invoiceRepo;
+
+    /**
+     * @var accountRepository
+     */
     protected $accountRepo;
 
+    /**
+     * SendReminders constructor.
+     *
+     * @param Mailer            $mailer
+     * @param InvoiceRepository $invoiceRepo
+     * @param accountRepository $accountRepo
+     */
     public function __construct(Mailer $mailer, InvoiceRepository $invoiceRepo, AccountRepository $accountRepo)
     {
         parent::__construct();
@@ -29,42 +57,81 @@ class SendReminders extends Command
 
     public function fire()
     {
-        $this->info(date('Y-m-d').' Running SendReminders...');
-        $today = new DateTime();
+        $this->info(date('Y-m-d') . ' Running SendReminders...');
 
-        $accounts = $this->accountRepo->findWithReminders();
-        $this->info(count($accounts).' accounts found');
+        if ($database = $this->option('database')) {
+            config(['database.default' => $database]);
+        }
+
+        $accounts = $this->accountRepo->findWithFees();
+        $this->info(count($accounts) . ' accounts found with fees');
 
         foreach ($accounts as $account) {
-            if (!$account->hasFeature(FEATURE_EMAIL_TEMPLATES_REMINDERS)) {
+            if (! $account->hasFeature(FEATURE_EMAIL_TEMPLATES_REMINDERS)) {
+                continue;
+            }
+
+            $invoices = $this->invoiceRepo->findNeedingReminding($account, false);
+            $this->info($account->name . ': ' . count($invoices) . ' invoices found');
+
+            foreach ($invoices as $invoice) {
+                if ($reminder = $account->getInvoiceReminder($invoice, false)) {
+                    $this->info('Charge fee: ' . $invoice->id);
+                    $number = preg_replace('/[^0-9]/', '', $reminder);
+                    $amount = $account->account_email_settings->{"late_fee{$number}_amount"};
+                    $percent = $account->account_email_settings->{"late_fee{$number}_percent"};
+                    $this->invoiceRepo->setLateFee($invoice, $amount, $percent);
+                }
+            }
+        }
+
+        $accounts = $this->accountRepo->findWithReminders();
+        $this->info(count($accounts) . ' accounts found with reminders');
+
+        /** @var \App\Models\Account $account */
+        foreach ($accounts as $account) {
+            if (! $account->hasFeature(FEATURE_EMAIL_TEMPLATES_REMINDERS)) {
                 continue;
             }
 
             $invoices = $this->invoiceRepo->findNeedingReminding($account);
-            $this->info($account->name . ': ' . count($invoices).' invoices found');
+            $this->info($account->name . ': ' . count($invoices) . ' invoices found');
 
+            /** @var Invoice $invoice */
             foreach ($invoices as $invoice) {
                 if ($reminder = $account->getInvoiceReminder($invoice)) {
-                    $this->info('Send to ' . $invoice->id);
+                    $this->info('Send email: ' . $invoice->id);
                     $this->mailer->sendInvoice($invoice, $reminder);
                 }
             }
         }
 
         $this->info('Done');
+
+        if ($errorEmail = env('ERROR_EMAIL')) {
+            \Mail::raw('EOM', function ($message) use ($errorEmail, $database) {
+                $message->to($errorEmail)
+                        ->from(CONTACT_EMAIL)
+                        ->subject("SendReminders [{$database}]: Finished successfully");
+            });
+        }
     }
 
+    /**
+     * @return array
+     */
     protected function getArguments()
     {
-        return array(
-            //array('example', InputArgument::REQUIRED, 'An example argument.'),
-        );
+        return [];
     }
 
+    /**
+     * @return array
+     */
     protected function getOptions()
     {
-        return array(
-            //array('example', null, InputOption::VALUE_OPTIONAL, 'An example option.', null),
-        );
+        return [
+            ['database', null, InputOption::VALUE_OPTIONAL, 'Database', null],
+        ];
     }
 }

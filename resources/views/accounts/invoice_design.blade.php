@@ -7,28 +7,38 @@
     @foreach ($account->getFontFolders() as $font)
         <script src="{{ asset('js/vfs_fonts/'.$font.'.js') }}" type="text/javascript"></script>
     @endforeach
-    <script src="{{ asset('pdf.built.js') }}" type="text/javascript"></script>
+    <script src="{{ asset('pdf.built.js') }}?no_cache={{ NINJA_VERSION }}" type="text/javascript"></script>
     <script src="{{ asset('js/lightbox.min.js') }}" type="text/javascript"></script>
     <link href="{{ asset('css/lightbox.css') }}" rel="stylesheet" type="text/css"/>
-
 @stop
 
-@section('content')	
+@section('head_css')
+	@parent
+
+	<style type="text/css">
+		.label-group {
+			display: none;
+		}
+	</style>
+@stop
+
+@section('content')
 	@parent
     @include('accounts.nav', ['selected' => ACCOUNT_INVOICE_DESIGN, 'advanced' => true])
+    @include('accounts.partials.invoice_fields')
 
   <script>
     var invoiceDesigns = {!! $invoiceDesigns !!};
     var invoiceFonts = {!! $invoiceFonts !!};
-    var invoice = {!! json_encode($invoice) !!};      
-      
+    var invoice = {!! json_encode($invoice) !!};
+
     function getDesignJavascript() {
       var id = $('#invoice_design_id').val();
       if (id == '-1') {
-        showMoreDesigns(); 
+        showMoreDesigns();
         $('#invoice_design_id').val(1);
         return invoiceDesigns[0].javascript;
-      } else {        
+      } else {
         var design = _.find(invoiceDesigns, function(design){ return design.id == id});
         return design ? design.javascript : '';
       }
@@ -44,7 +54,7 @@
         jQuery.getScript({!! json_encode(asset('js/vfs_fonts/%s.js')) !!}.replace('%s', fontFolder), function(){window.loadingFonts=false;ninjaLoadFontVfs();refreshPDF()})
       }
     }
-    
+
     function getPDFString(cb) {
       invoice.features = {
           customize_invoice_design:{{ Auth::user()->hasFeature(FEATURE_CUSTOMIZE_INVOICE_DESIGN) ? 'true' : 'false' }},
@@ -56,39 +66,46 @@
       invoice.account.hide_paid_to_date = $('#hide_paid_to_date').is(":checked");
       invoice.invoice_design_id = $('#invoice_design_id').val();
       invoice.account.page_size = $('#page_size option:selected').text();
-      
+      invoice.account.invoice_fields = ko.mapping.toJSON(model);
+
       NINJA.primaryColor = $('#primary_color').val();
       NINJA.secondaryColor = $('#secondary_color').val();
       NINJA.fontSize = parseInt($('#font_size').val());
       NINJA.headerFont = $('#header_font_id option:selected').text();
       NINJA.bodyFont = $('#body_font_id option:selected').text();
-      
-      var fields = [
-          'item', 
-          'description', 
-          'unit_cost', 
-          'quantity', 
-          'line_total', 
-          'terms', 
-          'balance_due', 
-          'partial_due'
-      ];
-      invoiceLabels.old = {};
+
+      var fields = {!! json_encode(App\Models\Account::$customLabels) !!};
       for (var i=0; i<fields.length; i++) {
         var field = fields[i];
         var val = $('#labels_' + field).val();
-        if (invoiceLabels.old.hasOwnProperty(field)) {
-            invoiceLabels.old[field] = invoiceLabels[field];
-        }
-        if (val) {
-            invoiceLabels[field] = val;
-        }
+		if ( ! invoiceLabels[field + '_orig']) {
+			invoiceLabels[field + '_orig'] = invoiceLabels[field];
+		}
+		invoiceLabels[field] = val || invoiceLabels[field + '_orig'];
       }
 
       generatePDF(invoice, getDesignJavascript(), true, cb);
     }
 
-    $(function() {   
+	function updateFieldLabels() {
+		@foreach (App\Models\Account::$customLabels as $field)
+			if ($('#labels_{{ $field }}').val()) {
+				$('.{{ $field }}-label-group').show();
+			} else {
+				$('.{{ $field }}-label-group').hide();
+			}
+		@endforeach
+	}
+
+	function onFieldChange() {
+		var $select = $('#label_field');
+        var id = $select.val();
+		$select.val(null).blur();
+		$('.' + id + '-label-group').fadeIn();
+		console.log(id);
+	}
+
+    $(function() {
       var options = {
         preferredFormat: 'hex',
         disabled: {!! Auth::user()->hasFeature(FEATURE_CUSTOMIZE_INVOICE_DESIGN) ? 'false' : 'true' !!},
@@ -102,23 +119,23 @@
       $('#secondary_color').spectrum(options);
       $('#header_font_id').change(function(){loadFont($('#header_font_id').val())});
       $('#body_font_id').change(function(){loadFont($('#body_font_id').val())});
-      
-      
+
+	  updateFieldLabels();
       refreshPDF();
     });
 
-  </script> 
+  </script>
 
 
   <div class="row">
     <div class="col-md-12">
 
       {!! Former::open()->addClass('warn-on-exit')->onchange('if(!window.loadingFonts)refreshPDF()') !!}
-      
+
       {!! Former::populateField('invoice_design_id', $account->invoice_design_id) !!}
-      {!! Former::populateField('body_font_id', $account->body_font_id) !!}
-      {!! Former::populateField('header_font_id', $account->header_font_id) !!}
-      {!! Former::populateField('live_preview', intval($account->live_preview)) !!}
+	  {!! Former::populateField('quote_design_id', $account->quote_design_id) !!}
+      {!! Former::populateField('body_font_id', $account->getBodyFontId()) !!}
+      {!! Former::populateField('header_font_id', $account->getHeaderFontId()) !!}
       {!! Former::populateField('font_size', $account->font_size) !!}
       {!! Former::populateField('page_size', $account->page_size) !!}
       {!! Former::populateField('invoice_embed_documents', intval($account->invoice_embed_documents)) !!}
@@ -129,45 +146,47 @@
       {!! Former::populateField('all_pages_header', intval($account->all_pages_header)) !!}
       {!! Former::populateField('all_pages_footer', intval($account->all_pages_footer)) !!}
 
-        @foreach ($invoiceLabels as $field => $value)
+          @foreach ($invoiceLabels as $field => $value)
           {!! Former::populateField("labels_{$field}", $value) !!}
         @endforeach
+
+        <div style="display:none">
+            {!! Former::text('invoice_fields_json')->data_bind('value: ko.mapping.toJSON(model)') !!}
+		</div>
+
 
     <div class="panel panel-default">
       <div class="panel-heading">
         <h3 class="panel-title">{!! trans('texts.invoice_design') !!}</h3>
       </div>
 
-        <div class="panel-body form-padding-right">
+        <div class="panel-body">
             <div role="tabpanel">
                 <ul class="nav nav-tabs" role="tablist" style="border: none">
-                    <li role="presentation" class="active"><a href="#generalSettings" aria-controls="generalSettings" role="tab" data-toggle="tab">{{ trans('texts.general_settings') }}</a></li>
-                    <li role="presentation"><a href="#invoiceLabels" aria-controls="invoiceLabels" role="tab" data-toggle="tab">{{ trans('texts.invoice_labels') }}</a></li>
-                    <li role="presentation"><a href="#invoiceOptions" aria-controls="invoiceOptions" role="tab" data-toggle="tab">{{ trans('texts.invoice_options') }}</a></li>
-                    <li role="presentation"><a href="#headerFooter" aria-controls="headerFooter" role="tab" data-toggle="tab">{{ trans('texts.header_footer') }}</a></li>
+                    <li role="presentation" class="active"><a href="#general_settings" aria-controls="general_settings" role="tab" data-toggle="tab">{{ trans('texts.general_settings') }}</a></li>
+                    <li role="presentation"><a href="#invoice_labels" aria-controls="invoice_labels" role="tab" data-toggle="tab">{{ trans('texts.invoice_labels') }}</a></li>
+                    <li role="presentation"><a href="#invoice_fields" aria-controls="invoice_fields" role="tab" data-toggle="tab">{{ trans('texts.invoice_fields') }}</a></li>
+                    <li role="presentation"><a href="#invoice_options" aria-controls="invoice_options" role="tab" data-toggle="tab">{{ trans('texts.invoice_options') }}</a></li>
+                    <li role="presentation"><a href="#header_footer" aria-controls="header_footer" role="tab" data-toggle="tab">{{ trans('texts.header_footer') }}</a></li>
                 </ul>
             </div>
             <div class="tab-content">
-                <div role="tabpanel" class="tab-pane active" id="generalSettings">
+                <div role="tabpanel" class="tab-pane active" id="general_settings">
                     <div class="panel-body">
 
                       <div class="row">
                         <div class="col-md-6">
 
-                          @if (!Utils::hasFeature(FEATURE_MORE_INVOICE_DESIGNS) || \App\Models\InvoiceDesign::count() == COUNT_FREE_DESIGNS_SELF_HOST)
-                            {!! Former::select('invoice_design_id')
-                                    ->fromQuery($invoiceDesigns, 'name', 'id')
-                                    ->addOption(trans('texts.more_designs') . '...', '-1') !!}
-                          @else 
-                            {!! Former::select('invoice_design_id')
-                                    ->fromQuery($invoiceDesigns, 'name', 'id') !!}
-                          @endif
+						  {!! Former::select('invoice_design_id')
+						  		  ->label('default_design')
+                                  ->fromQuery($invoiceDesigns, 'name', 'id') !!}
+						  {!! Former::select('quote_design_id')
+						  		  ->label('quote_design')
+                                  ->fromQuery($invoiceDesigns, 'name', 'id') !!}
                           {!! Former::select('body_font_id')
                                   ->fromQuery($invoiceFonts, 'name', 'id') !!}
                           {!! Former::select('header_font_id')
                                   ->fromQuery($invoiceFonts, 'name', 'id') !!}
-
-                          {!! Former::checkbox('live_preview')->text(trans('texts.enable')) !!}                        
 
                         </div>
                         <div class="col-md-6">
@@ -177,7 +196,7 @@
 
                           {!! Former::select('page_size')
                                   ->options($pageSizes) !!}
-                                  
+
                           {!! Former::text('font_size')
                                 ->type('number')
                                 ->min('0')
@@ -193,42 +212,66 @@
                         </div>
                       </div>
 
-                      <div class="help-block">
+                      <div class="help-block" style="padding-top:16px">
                         {{ trans('texts.color_font_help') }}
                       </div>
 
                     </div>
                 </div>
-                <div role="tabpanel" class="tab-pane" id="invoiceLabels">
+                <div role="tabpanel" class="tab-pane" id="invoice_labels">
                     <div class="panel-body">
 
                       <div class="row">
                         <div class="col-md-6">
-                              {!! Former::text('labels_item')->label(trans('texts.item')) !!}
-                              {!! Former::text('labels_description')->label(trans('texts.description')) !!}
-                              {!! Former::text('labels_unit_cost')->label(trans('texts.unit_cost')) !!}
-                              {!! Former::text('labels_quantity')->label(trans('texts.quantity')) !!}
-                        </div>
-                        <div class="col-md-6">
-                              {!! Former::text('labels_line_total')->label(trans('texts.line_total')) !!}
-                              {!! Former::text('labels_terms')->label(trans('texts.terms')) !!}
-                              {!! Former::text('labels_balance_due')->label(trans('texts.balance_due')) !!}
-                              {!! Former::text('labels_partial_due')->label(trans('texts.partial_due')) !!}
+							{!! Former::select('label_field')
+									->placeholder('select_label')
+									->label('label')
+									->onchange('onFieldChange()')
+									->options(array_combine(App\Models\Account::$customLabels, Utils::trans(App\Models\Account::$customLabels))) !!}
+						</div>
+						<div class="col-md-6">
+							@foreach (App\Models\Account::$customLabels as $field)
+								{!! Former::text('labels_' . $field)
+										->label($field)
+										->addGroupClass($field . '-label-group label-group') !!}
+							@endforeach
                         </div>
                       </div>
 
                     </div>
                 </div>
-                <div role="tabpanel" class="tab-pane" id="invoiceOptions">
+                <div role="tabpanel" class="tab-pane" id="invoice_fields">
+                    <div class="panel-body">
+                      <div class="row">
+                          @include('accounts.partials.invoice_fields_selector', ['section' => 'invoice_fields', 'fields' => INVOICE_FIELDS_INVOICE])
+                          @include('accounts.partials.invoice_fields_selector', ['section' => 'client_fields', 'fields' => INVOICE_FIELDS_CLIENT])
+                          @include('accounts.partials.invoice_fields_selector', ['section' => 'account_fields1', 'fields' => INVOICE_FIELDS_ACCOUNT])
+                          @include('accounts.partials.invoice_fields_selector', ['section' => 'account_fields2', 'fields' => INVOICE_FIELDS_ACCOUNT])
+                      </div>
+                      <div class="row" style="padding-top:30px">
+                          <div class="pull-left help-block">
+                              {{ trans('texts.invoice_fields_help') }}
+                          </div>
+                          <div class="pull-right" style="padding-right:14px">
+                              {!! Button::normal(trans('texts.reset'))
+                                    ->withAttributes(['onclick' => 'sweetConfirm(function() {
+                                        resetFields();
+                                    })'])
+                                    ->small() !!}
+                          </div>
+                      </div>
+                    </div>
+                </div>
+                <div role="tabpanel" class="tab-pane" id="invoice_options">
                     <div class="panel-body">
 
-                      {!! Former::checkbox('hide_quantity')->text(trans('texts.hide_quantity_help')) !!}
-                      {!! Former::checkbox('hide_paid_to_date')->text(trans('texts.hide_paid_to_date_help')) !!}
-                      {!! Former::checkbox('invoice_embed_documents')->text(trans('texts.invoice_embed_documents_help')) !!}
+                      {!! Former::checkbox('hide_quantity')->text(trans('texts.hide_quantity_help'))->value(1) !!}
+                      {!! Former::checkbox('hide_paid_to_date')->text(trans('texts.hide_paid_to_date_help'))->value(1) !!}
+                      {!! Former::checkbox('invoice_embed_documents')->text(trans('texts.invoice_embed_documents_help'))->value(1) !!}
 
                     </div>
                 </div>
-                <div role="tabpanel" class="tab-pane" id="headerFooter">
+                <div role="tabpanel" class="tab-pane" id="header_footer">
                     <div class="panel-body">
 
                     {!! Former::inline_radios('all_pages_header')
@@ -253,25 +296,23 @@
 
 
     <br/>
-    {!! Former::actions( 
-            Button::primary(trans('texts.customize'))
-                ->appendIcon(Icon::create('edit'))
-                ->asLinkTo(URL::to('/settings/customize_design'))
-                ->large(),
-            Button::success(trans('texts.save'))
-                ->submit()->large()
-                ->appendIcon(Icon::create('floppy-disk'))
-                ->withAttributes(['class' => 'save-button'])
+    {!! Former::actions(
+			$account->getCustomDesign(CUSTOM_DESIGN1) ?
+				DropdownButton::primary(trans('texts.customize'))
+					->withContents($account->present()->customDesigns)
+					->large()  :
+	            Button::primary(trans('texts.customize'))
+	                ->appendIcon(Icon::create('edit'))
+	                ->asLinkTo(URL::to('/settings/customize_design') . '?design_id=' . CUSTOM_DESIGN1)
+	                ->large(),
+            Auth::user()->hasFeature(FEATURE_CUSTOMIZE_INVOICE_DESIGN) ?
+                Button::success(trans('texts.save'))
+                    ->submit()->large()
+                    ->appendIcon(Icon::create('floppy-disk'))
+                    ->withAttributes(['class' => 'save-button']) :
+                false
         ) !!}
     <br/>
-
-      @if (!Auth::user()->hasFeature(FEATURE_CUSTOMIZE_INVOICE_DESIGN))
-        <script>
-              $(function() {   
-                $('form.warn-on-exit input, .save-button').prop('disabled', true);
-              });
-          </script> 
-      @endif
 
       {!! Former::close() !!}
 

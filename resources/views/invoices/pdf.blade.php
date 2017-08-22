@@ -1,5 +1,9 @@
-<iframe id="theFrame" style="display:none" frameborder="1" width="100%" height="{{ isset($pdfHeight) ? $pdfHeight : 1180 }}px"></iframe>
-<canvas id="theCanvas" style="display:none;width:100%;border:solid 1px #CCCCCC;"></canvas>
+@if (empty($hide_pdf))
+<object id="pdfObject" type="application/pdf" style="display:block;background-color:#525659;border:solid 2px #9a9a9a;" frameborder="1" width="100%" height="{{ isset($pdfHeight) ? $pdfHeight : 1180 }}px"></object>
+<div id="pdfCanvas" style="display:none;width:100%;background-color:#525659;border:solid 2px #9a9a9a;padding-top:40px;text-align:center">
+    <canvas id="theCanvas" style="max-width:100%;border:solid 1px #CCCCCC;"></canvas>
+</div>
+@endif
 
 @if (!Utils::isNinja() || !Utils::isPro())
 <div class="modal fade" id="moreDesignsModal" tabindex="-1" role="dialog" aria-labelledby="moreDesignsModalLabel" aria-hidden="true">
@@ -13,9 +17,9 @@
       <div class="container">
         @if (Utils::isNinja())
           <h3>{{ trans('texts.more_designs_cloud_header') }}</h3>
-          <p>{{ trans('texts.more_designs_cloud_text') }}</p>          
+          <p>{{ trans('texts.more_designs_cloud_text') }}</p>
         @else
-          <h3>{{ trans('texts.more_designs_self_host_header') }}</h3>
+          <h3>{{ trans('texts.more_designs_self_host_header', ['price' => INVOICE_DESIGNS_PRICE]) }}</h3>
           <p>{{ trans('texts.more_designs_self_host_text') }}</p>
         @endif
       </div>
@@ -44,11 +48,11 @@
         <p>&nbsp;</p>
       </center>
 
-      <div class="modal-footer" id="signUpFooter">          
+      <div class="modal-footer" id="signUpFooter">
         <button type="button" class="btn btn-default" data-dismiss="modal">{{ trans('texts.cancel') }}</button>
-        
+
         @if (Utils::isNinjaProd())
-          <button type="button" class="btn btn-primary" onclick="showProPlan('invoice_designs')">{{ trans('texts.go_pro') }}</button>
+          <a class="btn btn-primary" href="javascript:showUpgradeModal()">{{ trans('texts.go_pro') }}</a>
         @else
           <button type="button" class="btn btn-primary" onclick="buyProduct('{{ INVOICE_DESIGNS_AFFILIATE_KEY }}', '{{ PRODUCT_INVOICE_DESIGNS }}')">{{ trans('texts.buy') }}</button>
         @endif
@@ -61,7 +65,7 @@
 
 <script type="text/javascript">
   window.logoImages = {};
-  
+
   logoImages.imageLogo1 = "{{ Form::image_data('images/report_logo1.jpg') }}";
   logoImages.imageLogoWidth1 =120;
   logoImages.imageLogoHeight1 = 40
@@ -70,7 +74,7 @@
   logoImages.imageLogoWidth2 =325/2;
   logoImages.imageLogoHeight2 = 81/2;
 
-  logoImages.imageLogo3 = "{{ Form::image_data('images/report_logo3.jpg') }}";
+  logoImages.imageLogo3 = "{{ Form::image_data('images/report_logo3.png') }}";
   logoImages.imageLogoWidth3 =325/2;
   logoImages.imageLogoHeight3 = 81/2;
 
@@ -79,7 +83,7 @@
   if (window.invoice) {
     invoice.image = window.accountLogo;
     invoice.imageWidth = {{ $account->getLogoWidth() }};
-    invoice.imageHeight = {{ $account->getLogoHeight() }};    
+    invoice.imageHeight = {{ $account->getLogoHeight() }};
   }
   @endif
 
@@ -95,39 +99,48 @@
       NINJA.secondaryColor = "";
       NINJA.fontSize = 9;
       NINJA.headerFont = "Roboto";
-      NINJA.bodyFont = "Roboto";    
+      NINJA.bodyFont = "Roboto";
   @endif
-  
+
   var invoiceLabels = {!! json_encode($account->getInvoiceLabels()) !!};
-
-  if (window.invoice) {
-    //invoiceLabels.item = invoice.has_tasks ? invoiceLabels.date : invoiceLabels.item_orig;
-    invoiceLabels.quantity = invoice.has_tasks ? invoiceLabels.hours : invoiceLabels.quantity_orig;
-    invoiceLabels.unit_cost = invoice.has_tasks ? invoiceLabels.rate : invoiceLabels.unit_cost_orig;
-  }
-
   var isRefreshing = false;
   var needsRefresh = false;
 
   function refreshPDF(force) {
-    //console.log('refresh PDF - force: ' + force + ' ' + (new Date()).getTime())
-    return getPDFString(refreshPDFCB, force);
+    try {
+        return getPDFString(refreshPDFCB, force);
+    } catch (exception) {
+        console.warn('Failed to generate PDF: %s', exception.message);
+        var href = location.href;
+        if (href.indexOf('/view/') > 0 && href.indexOf('phantomjs') == -1) {
+            var url = href.replace('/view/', '/download/') + '?base64=true';
+            $.get(url, function(result) {
+                if (result && result.indexOf('data:application/pdf') == 0) {
+                    refreshPDFCB(result);
+                }
+            })
+        }
+    }
   }
-  
+
   function refreshPDFCB(string) {
     if (!string) return;
+    @if ( !empty($hide_pdf))
+        return;
+    @endif
     PDFJS.workerSrc = '{{ asset('js/pdf_viewer.worker.js') }}';
-    var forceJS = {{ Auth::check() && Auth::user()->force_pdfjs ? 'false' : 'true' }};
-    // Temporarily workaround for: https://code.google.com/p/chromium/issues/detail?id=574648 
-    if (forceJS && (isFirefox || (isChrome && (!isChrome48 || {{ isset($viewPDF) && $viewPDF ? 'true' : 'false' }})))) { 
-      $('#theFrame').attr('src', string).show();
-    } else {      
+    var forceJS = {{ Auth::check() && Auth::user()->force_pdfjs ? 'true' : 'false' }};
+    // Use the browser's built in PDF viewer
+    if ((isChrome || isFirefox) && ! forceJS && ! isMobile) {
+      document.getElementById('pdfObject').data = string;
+    // Use PDFJS to view the PDF
+    } else {
       if (isRefreshing) {
         needsRefresh = true;
         return;
       }
       isRefreshing = true;
-      var pdfAsArray = convertDataURIToBinary(string);  
+      var pdfAsArray = convertDataURIToBinary(string);
       PDFJS.getDocument(pdfAsArray).then(function getPdfHelloWorld(pdf) {
 
         pdf.getPage(1).then(function getPageHelloWorld(page) {
@@ -140,14 +153,15 @@
           canvas.width = viewport.width;
 
           page.render({canvasContext: context, viewport: viewport});
-          $('#theCanvas').show();
+          $('#pdfObject').hide();
+          $('#pdfCanvas').show();
           isRefreshing = false;
           if (needsRefresh) {
             needsRefresh = false;
             refreshPDF();
           }
         });
-      }); 
+      });
     }
   }
 

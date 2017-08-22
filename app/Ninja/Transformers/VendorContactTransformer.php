@@ -1,8 +1,9 @@
-<?php namespace App\Ninja\Transformers;
+<?php
 
-use App\Models\Account;
+namespace App\Ninja\Transformers;
+
 use App\Models\VendorContact;
-use League\Fractal;
+
 // vendor
 class VendorContactTransformer extends EntityTransformer
 {

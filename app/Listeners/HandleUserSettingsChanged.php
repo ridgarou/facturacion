@@ -1,35 +1,40 @@
-<?php namespace App\Listeners;
+<?php
 
+namespace App\Listeners;
+
+use App\Events\UserSettingsChanged;
+use App\Ninja\Mailers\UserMailer;
+use App\Ninja\Repositories\AccountRepository;
 use Auth;
 use Session;
-use App\Events\UserSettingsChanged;
-use App\Ninja\Repositories\AccountRepository;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Contracts\Queue\ShouldBeQueued;
-use App\Ninja\Mailers\UserMailer;
 
-class HandleUserSettingsChanged {
-
-	/**
-	 * Create the event handler.
-	 *
-	 * @return void
-	 */
-	public function __construct(AccountRepository $accountRepo, UserMailer $userMailer)
-	{
+/**
+ * Class HandleUserSettingsChanged.
+ */
+class HandleUserSettingsChanged
+{
+    /**
+     * Create the event handler.
+     *
+     * @param AccountRepository $accountRepo
+     * @param UserMailer        $userMailer
+     */
+    public function __construct(AccountRepository $accountRepo, UserMailer $userMailer)
+    {
         $this->accountRepo = $accountRepo;
         $this->userMailer = $userMailer;
-	}
+    }
 
-	/**
-	 * Handle the event.
-	 *
-	 * @param  UserSettingsChanged  $event
-	 * @return void
-	 */
-	public function handle(UserSettingsChanged $event)
-	{
-        if (!Auth::check()) {
+    /**
+     * Handle the event.
+     *
+     * @param UserSettingsChanged $event
+     *
+     * @return void
+     */
+    public function handle(UserSettingsChanged $event)
+    {
+        if (! Auth::check()) {
             return;
         }
 
@@ -43,6 +48,5 @@ class HandleUserSettingsChanged {
             $this->userMailer->sendConfirmation($event->user);
             Session::flash('warning', trans('texts.verify_email'));
         }
-	}
-
+    }
 }

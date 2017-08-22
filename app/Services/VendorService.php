@@ -1,115 +1,79 @@
-<?php namespace App\Services;
+<?php
 
-use Utils;
-use URL;
-use Auth;
+namespace App\Services;
+
 use App\Models\Vendor;
-use App\Models\Expense;
-use App\Services\BaseService;
-use App\Ninja\Repositories\VendorRepository;
+use App\Ninja\Datatables\VendorDatatable;
 use App\Ninja\Repositories\NinjaRepository;
+use App\Ninja\Repositories\VendorRepository;
+use Auth;
+use Utils;
 
+/**
+ * Class VendorService.
+ */
 class VendorService extends BaseService
 {
+    /**
+     * @var VendorRepository
+     */
     protected $vendorRepo;
+
+    /**
+     * @var DatatableService
+     */
     protected $datatableService;
 
-    public function __construct(VendorRepository $vendorRepo, DatatableService $datatableService, NinjaRepository $ninjaRepo)
-    {
-        $this->vendorRepo       = $vendorRepo;
-        $this->ninjaRepo        = $ninjaRepo;
+    /**
+     * VendorService constructor.
+     *
+     * @param VendorRepository $vendorRepo
+     * @param DatatableService $datatableService
+     * @param NinjaRepository  $ninjaRepo
+     */
+    public function __construct(
+        VendorRepository $vendorRepo,
+        DatatableService $datatableService,
+        NinjaRepository $ninjaRepo
+    ) {
+        $this->vendorRepo = $vendorRepo;
+        $this->ninjaRepo = $ninjaRepo;
         $this->datatableService = $datatableService;
     }
 
+    /**
+     * @return VendorRepository
+     */
     protected function getRepo()
     {
         return $this->vendorRepo;
     }
 
-    public function save($data, $vendor = null)
+    /**
+     * @param array       $data
+     * @param Vendor|null $vendor
+     *
+     * @return mixed|null
+     */
+    public function save(array $data, Vendor $vendor = null)
     {
-        if (Auth::user()->account->isNinjaAccount() && isset($data['plan'])) {
-            $this->ninjaRepo->updatePlanDetails($data['public_id'], $data);
-        }
-
         return $this->vendorRepo->save($data, $vendor);
     }
 
+    /**
+     * @param $search
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function getDatatable($search)
     {
+        $datatable = new VendorDatatable();
         $query = $this->vendorRepo->find($search);
-        
-        if(!Utils::hasPermission('view_all')){
+
+        if (! Utils::hasPermission('view_all')) {
             $query->where('vendors.user_id', '=', Auth::user()->id);
         }
 
-        return $this->createDatatable(ENTITY_VENDOR, $query);
-    }
-
-    protected function getDatatableColumns($entityType, $hideVendor)
-    {
-        return [
-            [
-                'name',
-                function ($model) {
-                    return link_to("vendors/{$model->public_id}", $model->name ?: '')->toHtml();
-                }
-            ],
-            [
-                'city',
-                function ($model) {
-                    return $model->city;
-                }
-            ],
-            [
-                'work_phone',
-                function ($model) {
-                    return $model->work_phone;
-                }
-            ],
-            [
-                'email',
-                function ($model) {
-                    return link_to("vendors/{$model->public_id}", $model->email ?: '')->toHtml();
-                }
-            ],
-            [
-                'vendors.created_at',
-                function ($model) {
-                    return Utils::timestampToDateString(strtotime($model->created_at));
-                }
-            ],
-        ];
-    }
-
-    protected function getDatatableActions($entityType)
-    {
-        return [
-            [
-                trans('texts.edit_vendor'),
-                function ($model) {
-                    return URL::to("vendors/{$model->public_id}/edit");
-                },
-                function ($model) {
-                    return Auth::user()->can('editByOwner', [ENTITY_VENDOR, $model->user_id]);
-                }
-            ],
-            [
-                '--divider--', function(){return false;},
-                function ($model) {
-                    return Auth::user()->can('editByOwner', [ENTITY_VENDOR, $model->user_id]) && Auth::user()->can('create', ENTITY_EXPENSE);
-                }
-                
-            ],
-            [
-                trans('texts.enter_expense'),
-                function ($model) {
-                    return URL::to("expenses/create/{$model->public_id}");
-                },
-                function ($model) {
-                    return Auth::user()->can('create', ENTITY_EXPENSE);
-                }
-            ]
-        ];
+        return $this->datatableService->createDatatable($datatable, $query);
     }
 }

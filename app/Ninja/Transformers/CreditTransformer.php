@@ -1,11 +1,19 @@
-<?php namespace App\Ninja\Transformers;
+<?php
 
-use App\Models\Account;
+namespace App\Ninja\Transformers;
+
 use App\Models\Credit;
-use League\Fractal;
 
+/**
+ * Class CreditTransformer.
+ */
 class CreditTransformer extends EntityTransformer
 {
+    /**
+     * @param Credit $credit
+     *
+     * @return array
+     */
     public function transform(Credit $credit)
     {
         return array_merge($this->getDefaults($credit), [
@@ -18,6 +26,8 @@ class CreditTransformer extends EntityTransformer
             'credit_date' => $credit->credit_date,
             'credit_number' => $credit->credit_number,
             'private_notes' => $credit->private_notes,
+            'public_notes' => $credit->public_notes,
+            'client_id' => $credit->client->public_id,
         ]);
     }
 }

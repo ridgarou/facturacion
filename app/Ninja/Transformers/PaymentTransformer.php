@@ -1,23 +1,23 @@
-<?php namespace App\Ninja\Transformers;
+<?php
+
+namespace App\Ninja\Transformers;
 
 use App\Models\Account;
-use App\Models\Payment;
-use App\Models\Invoice;
 use App\Models\Client;
-use League\Fractal;
-use App\Ninja\Transformers\InvoiceTransformer;
+use App\Models\Invoice;
+use App\Models\Payment;
 
 /**
  * @SWG\Definition(definition="Payment", required={"invoice_id"}, @SWG\Xml(name="Payment"))
  */
-
 class PaymentTransformer extends EntityTransformer
 {
     /**
-    * @SWG\Property(property="id", type="integer", example=1, readOnly=true)
-    * @SWG\Property(property="amount", type="float", example=10, readOnly=true)
-    * @SWG\Property(property="invoice_id", type="integer", example=1)
-    */
+     * @SWG\Property(property="id", type="integer", example=1, readOnly=true)
+     * @SWG\Property(property="amount", type="number", format="float", example=10, readOnly=true)
+     * @SWG\Property(property="invoice_id", type="integer", example=1)
+     * @SWG\Property(property="private_notes", type="string", example="Notes...")
+     */
     protected $defaultIncludes = [];
 
     protected $availableIncludes = [
@@ -25,23 +25,24 @@ class PaymentTransformer extends EntityTransformer
         'invoice',
     ];
 
-
     public function __construct($account = null, $serializer = null, $invoice = null)
     {
         parent::__construct($account, $serializer);
-        
+
         $this->invoice = $invoice;
     }
 
     public function includeInvoice(Payment $payment)
     {
         $transformer = new InvoiceTransformer($this->account, $this->serializer);
+
         return $this->includeItem($payment->invoice, $transformer, 'invoice');
     }
 
     public function includeClient(Payment $payment)
     {
         $transformer = new ClientTransformer($this->account, $this->serializer);
+
         return $this->includeItem($payment->client, $transformer, 'client');
     }
 
@@ -57,6 +58,8 @@ class PaymentTransformer extends EntityTransformer
             'is_deleted' => (bool) $payment->is_deleted,
             'payment_type_id' => (int) $payment->payment_type_id,
             'invoice_id' => (int) ($this->invoice ? $this->invoice->public_id : $payment->invoice->public_id),
+            'invoice_number' => $this->invoice ? $this->invoice->invoice_number : $payment->invoice->invoice_number,
+            'private_notes' => $payment->private_notes,
         ]);
     }
 }
