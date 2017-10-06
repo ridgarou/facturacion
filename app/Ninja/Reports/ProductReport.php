@@ -4,6 +4,7 @@ namespace App\Ninja\Reports;
 
 use App\Models\Client;
 use Auth;
+use Utils;
 
 class ProductReport extends AbstractReport
 {
@@ -42,14 +43,19 @@ class ProductReport extends AbstractReport
 
         foreach ($clients->get() as $client) {
             foreach ($client->invoices as $invoice) {
+                if (! $invoice->isPaid() && $status == 'paid') {
+                    continue;
+                } elseif ($invoice->isPaid() && $status == 'unpaid') {
+                    continue;
+                }
                 foreach ($invoice->invoice_items as $item) {
                     $this->data[] = [
                         $this->isExport ? $client->getDisplayName() : $client->present()->link,
                         $this->isExport ? $invoice->invoice_number : $invoice->present()->link,
                         $invoice->present()->invoice_date,
                         $item->product_key,
-                        $item->qty,
-                        $account->formatMoney($item->cost, $client),
+                        Utils::roundSignificant($item->qty, 0),
+                        Utils::roundSignificant($item->cost, 2),
                     ];
                 }
 
