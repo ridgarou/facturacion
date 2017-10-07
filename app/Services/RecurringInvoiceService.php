@@ -1,10 +1,11 @@
-<?php namespace App\Services;
+<?php
 
-use URL;
+namespace App\Services;
+
+use App\Ninja\Datatables\RecurringInvoiceDatatable;
+use App\Ninja\Repositories\InvoiceRepository;
 use Auth;
 use Utils;
-use App\Models\Invoice;
-use App\Ninja\Repositories\InvoiceRepository;
 
 class RecurringInvoiceService extends BaseService
 {
@@ -17,66 +18,15 @@ class RecurringInvoiceService extends BaseService
         $this->datatableService = $datatableService;
     }
 
-    public function getDatatable($accountId, $clientPublicId = null, $entityType, $search)
+    public function getDatatable($accountId, $clientPublicId, $entityType, $search)
     {
+        $datatable = new RecurringInvoiceDatatable(true, $clientPublicId);
         $query = $this->invoiceRepo->getRecurringInvoices($accountId, $clientPublicId, $search);
 
-        if(!Utils::hasPermission('view_all')){
+        if (! Utils::hasPermission('view_all')) {
             $query->where('invoices.user_id', '=', Auth::user()->id);
         }
-        
-        return $this->createDatatable(ENTITY_RECURRING_INVOICE, $query, !$clientPublicId);
-    }
 
-    protected function getDatatableColumns($entityType, $hideClient)
-    {
-        return [
-            [
-                'frequency',
-                function ($model) {
-                    return link_to("invoices/{$model->public_id}", $model->frequency)->toHtml();
-                }
-            ],
-            [
-                'client_name',
-                function ($model) {
-                    return link_to("clients/{$model->client_public_id}", Utils::getClientDisplayName($model))->toHtml();
-                },
-                ! $hideClient
-            ],
-            [
-                'start_date',
-                function ($model) {
-                    return Utils::fromSqlDate($model->start_date);
-                }
-            ],
-            [
-                'end_date',
-                function ($model) {
-                    return Utils::fromSqlDate($model->end_date);
-                }
-            ],
-            [
-                'amount',
-                function ($model) {
-                    return Utils::formatMoney($model->amount, $model->currency_id, $model->country_id);
-                }
-            ]
-        ];
-    }
-
-    protected function getDatatableActions($entityType)
-    {
-        return [
-            [
-                trans('texts.edit_invoice'),
-                function ($model) {
-                    return URL::to("invoices/{$model->public_id}/edit");
-                },
-                function ($model) {
-                    return Invoice::canEditItem($model);
-                }
-            ]
-        ];
+        return $this->datatableService->createDatatable($datatable, $query);
     }
 }

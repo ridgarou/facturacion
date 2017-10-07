@@ -1,33 +1,51 @@
-<?php namespace App\Ninja\Presenters;
+<?php
 
+namespace App\Ninja\Presenters;
+
+use Carbon;
 use Utils;
-use Laracasts\Presenter\Presenter;
 
-class ExpensePresenter extends Presenter {
-
-    // Expenses
+/**
+ * Class ExpensePresenter.
+ */
+class ExpensePresenter extends EntityPresenter
+{
+    /**
+     * @return string
+     */
     public function vendor()
     {
         return $this->entity->vendor ? $this->entity->vendor->getDisplayName() : '';
     }
 
+    /**
+     * @return \DateTime|string
+     */
     public function expense_date()
     {
         return Utils::fromSqlDate($this->entity->expense_date);
     }
 
-    public function converted_amount()
+    /**
+     * @return \DateTime|string
+     */
+    public function payment_date()
     {
-        return round($this->entity->amount * $this->entity->exchange_rate, 2);
+        return Utils::fromSqlDate($this->entity->payment_date);
     }
 
-    public function invoiced_amount()
+    public function month()
     {
-        return $this->entity->invoice_id ? $this->converted_amount() : 0;
+        return Carbon::parse($this->entity->payment_date)->format('Y m');
     }
 
-    public function link()
+    public function amount()
     {
-        return link_to('/expenses/' . $this->entity->public_id, $this->entity->name);
+        return Utils::formatMoney($this->entity->amount, $this->entity->expense_currency_id);
+    }
+
+    public function category()
+    {
+        return $this->entity->expense_category ? $this->entity->expense_category->name : '';
     }
 }

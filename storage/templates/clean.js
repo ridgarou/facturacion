@@ -7,7 +7,7 @@
             },
             {
                 "stack": "$accountDetails",
-                "margin": [40, 0, 0, 0]
+                "margin": [7, 0, 0, 0]
             },
             {
                 "stack": "$accountAddress"
@@ -87,6 +87,12 @@
                 }
             }
         ]
+    },
+    {
+        "stack": [
+            "$invoiceDocuments"
+        ],
+        "style": "invoiceDocuments"
     }
     ],
     "defaultStyle": {
@@ -138,10 +144,10 @@
             "color": "$primaryColor:#37a3c6",
             "bold": true
         },
-        "balanceDueLabel": {
+        "subtotalsBalanceDueLabel": {
             "fontSize": "$fontSizeLarger"
         },
-        "balanceDue": {
+        "subtotalsBalanceDue": {
             "fontSize": "$fontSizeLarger",
             "color": "$primaryColor:#37a3c6"
         },  
@@ -200,6 +206,12 @@
         "help": {
             "fontSize": "$fontSizeSmaller",
             "color": "#737373"
+        },
+        "invoiceDocuments": {
+            "margin": [7, 0, 7, 0]
+        },
+        "invoiceDocument": {
+            "margin": [0, 10, 0, 10]
         }
     },
     "pageMargins": [40, 40, 40, 60]

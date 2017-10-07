@@ -25,11 +25,16 @@
 
 
     {!! Former::vertical_open()->addClass('warn-on-exit') !!}
-    {!! Former::populate($account) !!}
 
-    @foreach ([ENTITY_INVOICE, ENTITY_QUOTE, ENTITY_PAYMENT, REMINDER1, REMINDER2, REMINDER3] as $type)
+    @foreach (App\Models\AccountEmailSettings::$templates as $type)
         @foreach (['subject', 'template'] as $field)
-            {!! Former::populateField("email_{$field}_{$type}", $templates[$type][$field]) !!}
+            {{ Former::populateField("email_{$field}_{$type}", $templates[$type][$field]) }}
+        @endforeach
+    @endforeach
+
+    @foreach ([TEMPLATE_REMINDER1, TEMPLATE_REMINDER2, TEMPLATE_REMINDER3] as $type)
+        @foreach (['enable', 'num_days', 'direction', 'field'] as $field)
+            {{ Former::populateField("{$field}_{$type}", $account->{"{$field}_{$type}"}) }}
         @endforeach
     @endforeach
 
@@ -70,9 +75,9 @@
                         <li role="presentation"><a href="#reminder3" aria-controls="footer" role="tab" data-toggle="tab">{{ trans('texts.third_reminder') }}</a></li>
                     </ul>
                     <div class="tab-content">
-                        @include('accounts.template', ['field' => 'reminder1', 'isReminder' => true, 'active' => true])
-                        @include('accounts.template', ['field' => 'reminder2', 'isReminder' => true])
-                        @include('accounts.template', ['field' => 'reminder3', 'isReminder' => true])
+                        @include('accounts.template', ['field' => 'reminder1', 'number' => 1, 'isReminder' => true, 'active' => true])
+                        @include('accounts.template', ['field' => 'reminder2', 'number' => 2, 'isReminder' => true])
+                        @include('accounts.template', ['field' => 'reminder3', 'number' => 3, 'isReminder' => true])
                     </div>
                 </div>
             </div>
@@ -80,52 +85,54 @@
     </div>
 
 
-    <div class="modal fade" id="templateHelpModal" tabindex="-1" role="dialog" aria-labelledby="templateHelpModalLabel" aria-hidden="true">
-        <div class="modal-dialog" style="min-width:150px">
+    <div class="modal fade" id="templatePreviewModal" tabindex="-1" role="dialog" aria-labelledby="templatePreviewModalLabel" aria-hidden="true">
+        <div class="modal-dialog" style="width:800px">
             <div class="modal-content">
                 <div class="modal-header">
                     <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-                    <h4 class="modal-title" id="templateHelpModalLabel">{{ trans('texts.template_help_title') }}</h4>
+                    <h4 class="modal-title" id="templatePreviewModalLabel">{{ trans('texts.preview') }}</h4>
                 </div>
 
-                <div class="modal-body">
-                    <p>{{ trans('texts.template_help_1') }}</p>
-                    <ul>
-                        @foreach (\App\Ninja\Mailers\ContactMailer::$variableFields as $field)
-                            <li>${{ $field }}</li>
-                        @endforeach
-                        @if ($account->custom_client_label1)
-                            <li>$customClient1</li>
-                        @endif
-                        @if ($account->custom_client_label2)
-                            <li>$customClient2</li>
-                        @endif
-                        @if ($account->custom_invoice_text_label1)
-                            <li>$customInvoice1</li>
-                        @endif
-                        @if ($account->custom_invoice_text_label2)
-                            <li>$customInvoice1</li>
-                        @endif
-                        @if (count($account->account_gateways) > 1)
-                            @foreach (\App\Models\Gateway::$paymentTypes as $type)
-                                @if ($account->getGatewayByType($type))
-                                    <li>${{ \App\Models\Gateway::getPaymentTypeName($type) }}Link</li>
-                                    <li>${{ \App\Models\Gateway::getPaymentTypeName($type) }}Button</li>
-                                @endif
-                            @endforeach
-                        @endif
-                    </ul>
+                <div class="container" style="width: 100%; padding-bottom: 0px !important">
+                <div class="panel panel-default">
+                <div class="panel-body">
+                    <iframe id="server-preview" style="background-color:#FFFFFF" frameborder="1" width="100%" height="500px"/></iframe>
+                </div>
+                </div>
                 </div>
 
-                <div class="modal-footer" style="margin-top: 0px">
+                <div class="modal-footer">
                     <button type="button" class="btn btn-primary" data-dismiss="modal">{{ trans('texts.close') }}</button>
                 </div>
-
             </div>
         </div>
     </div>
 
-    @if (Auth::user()->isPro())
+    <div class="modal fade" id="rawModal" tabindex="-1" role="dialog" aria-labelledby="rawModalLabel" aria-hidden="true">
+        <div class="modal-dialog" style="width:800px">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+                    <h4 class="modal-title" id="rawModalLabel">{{ trans('texts.raw_html') }}</h4>
+                </div>
+
+                <div class="container" style="width: 100%; padding-bottom: 0px !important">
+                <div class="panel panel-default">
+                <div class="modal-body">
+                    <textarea id="raw-textarea" rows="20" style="width:100%"></textarea>
+                </div>
+                </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">{{ trans('texts.close') }}</button>
+                    <button type="button" onclick="updateRaw()" class="btn btn-success" data-dismiss="modal">{{ trans('texts.update') }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (Auth::user()->hasFeature(FEATURE_EMAIL_TEMPLATES_REMINDERS))
         <center>
             {!! Button::success(trans('texts.save'))->submit()->large()->appendIcon(Icon::create('floppy-disk')) !!}
         </center>
@@ -141,9 +148,10 @@
 
     <script type="text/javascript">
 
-        var entityTypes = ['invoice', 'quote', 'payment', 'reminder1', 'reminder2', 'reminder3'];
+        var entityTypes = {!! json_encode(App\Models\AccountEmailSettings::$templates) !!};
         var stringTypes = ['subject', 'template'];
         var templates = {!! json_encode($defaultTemplates) !!};
+        var account = {!! Auth::user()->account !!};
 
         function refreshPreview() {
             for (var i=0; i<entityTypes.length; i++) {
@@ -153,9 +161,25 @@
                     var idName = '#email_' + stringType + '_' + entityType;
                     var value = $(idName).val();
                     var previewName = '#' + entityType + '_' + stringType + '_preview';
-                    $(previewName).html(processVariables(value));
+                    var isQuote = entityType == "{{ ENTITY_QUOTE }}";
+                    $(previewName).html(renderEmailTemplate(value, false, isQuote));
                 }
-            }            
+            }
+        }
+
+        function serverPreview(field) {
+            $('#templatePreviewModal').modal('show');
+            var template = $('#email_template_' + field).val();
+            var url = '{{ URL::to('settings/email_preview') }}?template=' + template;
+            $('#server-preview').attr('src', url).load(function() {
+                // disable links in the preview
+                $('iframe').contents().find('a').each(function(index) {
+                    $(this).on('click', function(event) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    });
+                });
+            });
         }
 
         $(function() {
@@ -168,20 +192,10 @@
                 }
             }
 
-            for (var i=1; i<=3; i++) {
-                $('#enable_reminder' + i).bind('click', {id: i}, function(event) {
-                    enableReminder(event.data.id)
-                });
-                enableReminder(i);
-            }
+            $('.show-when-ready').show();
 
             refreshPreview();
         });
-
-        function enableReminder(id) {            
-            var checked = $('#enable_reminder' + id).is(':checked');
-            $('.enable-reminder' + id).attr('disabled', !checked)
-        }
 
         function setDirectionShown(field) {
             var val = $('#field_' + field).val();
@@ -194,62 +208,8 @@
             }
         }
 
-        function processVariables(str) {
-            if (!str) {
-                return '';
-            }
-
-            var keys = {!! json_encode(\App\Ninja\Mailers\ContactMailer::$variableFields) !!};
-            var passwordHtml = "{!! $account->isPro() && $account->enable_portal_password && $account->send_portal_password?'<p>'.trans('texts.password').': 6h2NWNdw6<p>':'' !!}";
-            var vals = [
-                {!! json_encode($emailFooter) !!}, 
-                "{{ $account->getDisplayName() }}", 
-                "{{ $account->formatDate($account->getDateTime()) }}",
-                "{{ $account->formatDate($account->getDateTime()) }}",
-                "Client Name", 
-                formatMoney(100), 
-                "Contact Name", 
-                "First Name",
-                "0001", 
-                "0001",
-                passwordHtml,
-                "{{ URL::to('/view/...') }}$password", 
-                '{!! Form::flatButton('view_invoice', '#0b4d78') !!}$password',
-                "{{ URL::to('/payment/...') }}$password", 
-                '{!! Form::flatButton('pay_now', '#36c157') !!}$password',
-            ];
-
-            // Add blanks for custom values
-            keys.push('customClient1', 'customClient2', 'customInvoice1', 'customInvoice2');
-            vals.push('custom value', 'custom value', 'custom value', 'custom value');
-
-            // Add any available payment method links
-            @foreach (\App\Models\Gateway::$paymentTypes as $type)
-                {!! "keys.push('" . \App\Models\Gateway::getPaymentTypeName($type).'Link' . "');" !!}
-                {!! "vals.push('" . URL::to('/payment/...') . "');" !!}
-
-                {!! "keys.push('" . \App\Models\Gateway::getPaymentTypeName($type).'Button' . "');" !!}
-                {!! "vals.push('" . Form::flatButton('pay_now', '#36c157') . "');" !!}
-            @endforeach
-
-            var includesPasswordPlaceholder = str.indexOf('$password') != -1;
-                
-            for (var i=0; i<keys.length; i++) {
-                var regExp = new RegExp('\\$'+keys[i], 'g');
-                str = str.replace(regExp, vals[i]);
-            }
-                 
-            if(!includesPasswordPlaceholder){
-                var lastSpot = str.lastIndexOf('$password')
-                str = str.slice(0, lastSpot) + str.slice(lastSpot).replace('$password', passwordHtml);
-            }
-            str = str.replace(/\$password/g,'');
-
-            return str;
-        }
-
         function resetText(section, field) {
-            if (confirm('{!! trans("texts.are_you_sure") !!}')) {
+            sweetConfirm(function() {
                 var fieldName = 'email_' + section + '_' + field;
                 var value = templates[field][section];
                 $('#' + fieldName).val(value);
@@ -257,11 +217,60 @@
                     editors[field].setHTML(value);
                 }
                 refreshPreview();
-            }
+            });
+        }
 
-            return false;
+        function showRaw(field) {
+            window.rawHtmlField = field;
+            var template = $('#email_template_' + field).val();
+            $('#raw-textarea').val(formatXml(template));
+            $('#rawModal').modal('show');
+        }
+
+        function updateRaw() {
+            var value = $('#raw-textarea').val();
+            var field = window.rawHtmlField;
+            editors[field].setHTML(value);
+            value = editors[field].getHTML();
+            var fieldName = 'email_template_' + field;
+            $('#' + fieldName).val(value);
+            refreshPreview();
+        }
+
+        // https://gist.github.com/sente/1083506
+        function formatXml(xml) {
+            var formatted = '';
+            var reg = /(>)(<)(\/*)/g;
+            xml = xml.replace(reg, '$1\r\n$2$3');
+            var pad = 0;
+            jQuery.each(xml.split('\r\n'), function(index, node) {
+                var indent = 0;
+                if (node.match( /.+<\/\w[^>]*>$/ )) {
+                    indent = 0;
+                } else if (node.match( /^<\/\w/ )) {
+                    if (pad != 0) {
+                        pad -= 1;
+                    }
+                } else if (node.match( /^<\w[^>]*[^\/]>.*$/ )) {
+                    indent = 1;
+                } else {
+                    indent = 0;
+                }
+
+                var padding = '';
+                for (var i = 0; i < pad; i++) {
+                    padding += '  ';
+                }
+
+                formatted += padding + node + '\r\n';
+                pad += indent;
+            });
+
+            return formatted;
         }
 
     </script>
+
+    @include('partials.email_templates')
 
 @stop

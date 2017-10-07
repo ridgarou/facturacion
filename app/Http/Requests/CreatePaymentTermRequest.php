@@ -1,10 +1,17 @@
-<?php namespace app\Http\Requests;
+<?php
 
-use App\Http\Requests\Request;
-use Illuminate\Validation\Factory;
+namespace App\Http\Requests;
 
-class CreatePaymentTermRequest extends Request
+use App\Models\Expense;
+use App\Models\Invoice;
+
+class CreateDocumentRequest extends DocumentRequest
 {
+    protected $autoload = [
+        ENTITY_INVOICE,
+        ENTITY_EXPENSE,
+    ];
+
     /**
      * Determine if the user is authorized to make this request.
      *
@@ -12,7 +19,19 @@ class CreatePaymentTermRequest extends Request
      */
     public function authorize()
     {
-        return true;
+        if (! $this->user()->hasFeature(FEATURE_DOCUMENTS)) {
+            return false;
+        }
+        
+        if ($this->invoice && $this->user()->cannot('edit', $this->invoice)) {
+            return false;
+        }
+
+        if ($this->expense && $this->user()->cannot('edit', $this->expense)) {
+            return false;
+        }
+
+        return $this->user()->can('create', ENTITY_DOCUMENT);
     }
 
     /**
@@ -23,8 +42,7 @@ class CreatePaymentTermRequest extends Request
     public function rules()
     {
         return [
-            'num_days' => 'required',
-            'name' => 'required',
+            //'file' => 'mimes:jpg'
         ];
     }
 }

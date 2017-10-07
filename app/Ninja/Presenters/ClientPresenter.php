@@ -1,41 +1,53 @@
-<?php namespace App\Ninja\Presenters;
+<?php
 
-use URL;
+namespace App\Ninja\Presenters;
+
 use Utils;
-use Laracasts\Presenter\Presenter;
 
-class ClientPresenter extends Presenter {
-
+class ClientPresenter extends EntityPresenter
+{
     public function country()
     {
         return $this->entity->country ? $this->entity->country->name : '';
     }
 
-    public function status()
+    public function balance()
     {
-        $class = $text = '';
+        $client = $this->entity;
+        $account = $client->account;
 
-        if ($this->entity->is_deleted) {
-            $class = 'danger';
-            $text = trans('texts.deleted');
-        } elseif ($this->entity->trashed()) {
-            $class = 'warning';
-            $text = trans('texts.archived');
-        } else {
-            $class = 'success';
-            $text = trans('texts.active');
+        return $account->formatMoney($client->balance, $client);
+    }
+
+    public function websiteLink()
+    {
+        $client = $this->entity;
+
+        if (! $client->website) {
+            return '';
         }
 
-        return "<span class=\"label label-{$class}\">{$text}</span>";
+        $link = Utils::addHttp($client->website);
+
+        return link_to($link, $client->website, ['target' => '_blank']);
     }
 
-    public function url()
+    public function paid_to_date()
     {
-        return URL::to('/clients/' . $this->entity->public_id);
+        $client = $this->entity;
+        $account = $client->account;
+
+        return $account->formatMoney($client->paid_to_date, $client);
     }
 
-    public function link()
+    public function paymentTerms()
     {
-        return link_to('/clients/' . $this->entity->public_id, $this->entity->getDisplayName());
+        $client = $this->entity;
+
+        if (! $client->payment_terms) {
+            return '';
+        }
+
+        return sprintf('%s: %s %s', trans('texts.payment_terms'), trans('texts.payment_terms_net'), $client->defaultDaysDue());
     }
 }

@@ -2,12 +2,12 @@
 
 @section('head')
     @parent
-    
+
     @include('money_script')
 
     <style type="text/css">
         table.accounts-table > thead > tr > th.header {
-            background-color: #e37329 !important;
+            background-color: #777 !important;
             color:#fff !important;
             padding-top:8px;
         }
@@ -30,15 +30,19 @@
         <div data-bind="visible: page() == 'login'">
             <div class="form-padding-right">
                 @if ($bankAccount)
-                    {!! Former::populateField('public_id', $bankAccount->public_id) !!}
+                    {!! Former::populate($bankAccount) !!}
                     {!! Former::hidden('public_id') !!}
                 @else
+                    {!! Former::populateField('app_version', DEFAULT_BANK_APP_VERSION) !!}
+                    {!! Former::populateField('ofx_version', DEFAULT_BANK_OFX_VERSION) !!}
                     {!! Former::select('bank_id')
                             ->data_bind('combobox: bank_id')
                             ->addOption('', '')
                             ->fromQuery($banks, 'name', 'id')
-                            ->blockHelp('texts.bank_accounts_help')  !!}
+                            ->blockHelp(trans('texts.bank_accounts_help', ['link' => OFX_HOME_URL]))  !!}
                 @endif
+
+                <br/>
 
                 {!! Former::password('bank_username')
                         ->data_bind("value: bank_username, valueUpdate: 'afterkeydown'")
@@ -48,6 +52,22 @@
                         ->label(trans('texts.password'))
                         ->data_bind("value: bank_password, valueUpdate: 'afterkeydown'")
                         ->blockHelp(trans(Request::secure() ? 'texts.bank_password_help' : 'texts.bank_password_warning')) !!}
+
+                <br/>
+
+                {!! Former::select('app_version')
+                        ->addOption('Quicken 2014', 2300)
+                        ->addOption('Quicken 2015', 2400)
+                        ->addOption('Quicken 2016', 2500)
+                        ->addOption('Quicken 2017', 2600) !!}
+
+                {!! Former::select('ofx_version')
+                        ->addOption('100', 100)
+                        ->addOption('101', 101)
+                        ->addOption('102', 102)
+                        ->addOption('103', 103)
+                        ->help('ofx_help') !!}
+
             </div>
         </div>
 
@@ -70,7 +90,7 @@
                         <td data-bind="text: masked_account_number"></td>
                         <td data-bind="text: balance"></td>
                         <td style="text-align:center">
-                            <input type="checkbox" value="1" 
+                            <input type="checkbox" value="1"
                                 data-bind="checked: includeAccount, attr: {name: 'bank_accounts[' + $index() + '][include]'}"/>
                         </td>
                     </tr>
@@ -80,8 +100,8 @@
 
 
         <div class="col-lg-12 col-sm-12" data-bind="visible: page() == 'import'" style="display:none">
-            <div class="row panel">
-                <div class="col-md-8" style="height:60px;padding-top:10px;">
+            <div class="row panel" style="padding-top:10px;padding-bottom:12px;">
+                <div class="col-md-8" style="padding-top:10px;">
                     <span data-bind="text: statusLabel"></span>
                 </div>
                 <div class="col-md-4">
@@ -110,19 +130,19 @@
                     <tbody data-bind="foreach: filteredTransactions">
                         <tr>
                             <td style="text-align:center">
-                                <input type="checkbox" value="1" 
+                                <input type="checkbox" value="1"
                                     data-bind="checked: includeTransaction, attr: {name: 'bank_accounts[' + $index() + '][include]'}"/>
                             </td>
                             <td>
-                                <input type="text" class="form-control" 
+                                <input type="text" class="form-control"
                                     data-bind="value: vendor.pretty, valueUpdate: 'afterkeydown'"/>
                             </td>
                             <td>
-                                <input type="text" class="form-control" 
+                                <input type="text" class="form-control"
                                     data-bind="value: info, valueUpdate: 'afterkeydown'"/>
                             </td>
                             <td>
-                                <input type="text" class="form-control" 
+                                <input type="text" class="form-control"
                                     data-bind="value: memo, valueUpdate: 'afterkeydown'"/>
                             </td>
                             <td data-bind="text: date" nowrap></td>
@@ -161,38 +181,40 @@
 
     <p/>&nbsp;<p/>
 
-    {!! Former::actions(
-        count(Cache::get('banks')) > 0 ? 
-            Button::normal(trans('texts.cancel'))
+    @if (Auth::user()->hasFeature(FEATURE_EXPENSES))
+        {!! Former::actions(
+            count(Cache::get('banks')) > 0 ?
+                Button::normal(trans('texts.cancel'))
+                    ->withAttributes([
+                        'data-bind' => 'visible: !importResults()',
+                    ])
+                    ->large()
+                    ->asLinkTo(URL::to('/settings/bank_accounts'))
+                    ->appendIcon(Icon::create('remove-circle')) : false,
+            Button::success(trans('texts.validate'))
                 ->withAttributes([
-                    'data-bind' => 'visible: !importResults()',
+                    'data-bind' => 'css: {disabled: disableValidate}, visible: page() == "login"',
+                    'onclick' => 'validate()'
                 ])
                 ->large()
-                ->asLinkTo(URL::to('/settings/bank_accounts'))
-                ->appendIcon(Icon::create('remove-circle')) : false,
-        Button::success(trans('texts.validate'))
-            ->withAttributes([
-                'data-bind' => 'css: {disabled: disableValidate}, visible: page() == "login"',
-                'onclick' => 'validate()'
-            ])
-            ->large()
-            ->appendIcon(Icon::create('lock')),
-        Button::success(trans('texts.save'))
-            ->withAttributes([
-                'data-bind' => 'css: {disabled: disableSave}, visible: page() == "setup"',
-                'style' => 'display:none',
-                'onclick' => 'save()'
-            ])
-            ->large()
-            ->appendIcon(Icon::create('floppy-disk'))   ,
-        Button::success(trans('texts.import'))
-            ->withAttributes([
-                'data-bind' => 'css: {disabled: disableSaveExpenses}, visible: page() == "import"',
-                'style' => 'display:none',
-                'onclick' => 'saveExpenses()'
-            ])
-            ->large()
-            ->appendIcon(Icon::create('floppy-disk'))) !!}
+                ->appendIcon(Icon::create('lock')),
+            Button::success(trans('texts.save'))
+                ->withAttributes([
+                    'data-bind' => 'css: {disabled: disableSave}, visible: page() == "setup"',
+                    'style' => 'display:none',
+                    'onclick' => 'save()'
+                ])
+                ->large()
+                ->appendIcon(Icon::create('floppy-disk'))   ,
+            Button::success(trans('texts.import'))
+                ->withAttributes([
+                    'data-bind' => 'css: {disabled: disableSaveExpenses}, visible: page() == "import"',
+                    'style' => 'display:none',
+                    'onclick' => 'saveExpenses()'
+                ])
+                ->large()
+                ->appendIcon(Icon::create('floppy-disk'))) !!}
+    @endif
 
     {!! Former::close() !!}
 
@@ -308,9 +330,9 @@
                         }
                     }
                 }
-                
+
             },
-            owner: self            
+            owner: self
         })
 
         self.amount.pretty = ko.computed({
@@ -351,7 +373,7 @@
 
         self.filteredTransactions = ko.computed(function() {
             if (!model.filter()) {
-                return self.transactions(); 
+                return self.transactions();
             } else {
                 return ko.utils.arrayFilter(self.transactions(), function(transaction) {
                     return transaction.isMatch(model.filter());
@@ -478,11 +500,16 @@
             return self.countExpenses() == 0;
         }, self);
     };
-     
+
     window.model = new ViewModel();
     ko.applyBindings(model);
 
+    @if (!empty($transactions))
+        loadTransactions({!! $transactions !!});
+        model.setPage('import');
+    @endif
+
     </script>
 
-    
+
 @stop

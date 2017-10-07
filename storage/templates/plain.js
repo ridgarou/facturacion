@@ -56,7 +56,7 @@
             "paddingTop": "$amount:8", 
             "paddingBottom": "$amount:8"            
         }
-    },    
+    },
     {
         "columns": [
             "$notesAndTerms",
@@ -77,6 +77,12 @@
                 }
             }
         ]
+    },    
+    {
+        "stack": [
+            "$invoiceDocuments"
+        ],
+        "style": "invoiceDocuments"
     }
     ],
     "footer": {
@@ -142,16 +148,19 @@
             "bold": true,
             "margin": [0, 0, 0, 4]
         },
+        "terms": {
+            "margin": [0, 0, 20, 0]
+        },
         "invoiceDetailBalanceDueLabel": {
             "fillColor": "#e6e6e6"
         },
         "invoiceDetailBalanceDue": {
             "fillColor": "#e6e6e6"
         },
-        "balanceDueLabel": {
+        "subtotalsBalanceDueLabel": {
             "fillColor": "#e6e6e6"
         },
-        "balanceDue": {
+        "subtotalsBalanceDue": {
             "fillColor": "#e6e6e6"
         },
         "header": {
@@ -166,7 +175,13 @@
         "help": {
             "fontSize": "$fontSizeSmaller",
             "color": "#737373"
-        }
+        },
+		"invoiceDocuments": {
+			"margin": [7, 0, 7, 0]
+		},
+		"invoiceDocument": {
+			"margin": [0, 10, 0, 10]
+		}
      },
     "pageMargins": [40, 40, 40, 60]
 }

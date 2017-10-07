@@ -8,10 +8,11 @@
     <td>{{ trans('texts.payment_date') }}</td>
     <td>{{ trans('texts.method') }}</td>
     <td>{{ trans('texts.transaction_reference') }}</td>
+    <td>{{ trans('texts.private_notes') }}</td>
 </tr>
 
 @foreach ($payments as $payment)
-    @if (!$payment->client->is_deleted)
+    @if ( ! $payment->client->is_deleted && ! $payment->invoice->is_deleted)
         <tr>
             <td>{{ $payment->present()->client }}</td>
             @if ($multiUser)
@@ -22,8 +23,7 @@
             <td>{{ $payment->present()->payment_date }}</td>
             <td>{{ $payment->present()->method }}</td>
             <td>{{ $payment->transaction_reference }}</td>
+            <td>{{ $payment->private_notes }}</td>
         </tr>
     @endif
 @endforeach
-
-<tr><td></td></tr>

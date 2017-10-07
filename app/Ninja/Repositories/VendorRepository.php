@@ -1,10 +1,11 @@
-<?php namespace App\Ninja\Repositories;
+<?php
 
-use DB;
-use App\Ninja\Repositories\BaseRepository;
+namespace App\Ninja\Repositories;
+
 use App\Models\Vendor;
-use App\Models\VendorContact;
-use App\Models\Activity;
+use DB;
+use Utils;
+
 // vendor
 class VendorRepository extends BaseRepository
 {
@@ -16,7 +17,7 @@ class VendorRepository extends BaseRepository
     public function all()
     {
         return Vendor::scope()
-                ->with('user', 'vendorcontacts', 'country')
+                ->with('user', 'vendor_contacts', 'country')
                 ->withTrashed()
                 ->where('is_deleted', '=', false)
                 ->get();
@@ -46,9 +47,7 @@ class VendorRepository extends BaseRepository
                         'vendors.user_id'
                     );
 
-        if (!\Session::get('show_trash:vendor')) {
-            $query->where('vendors.deleted_at', '=', null);
-        }
+        $this->applyFilters($query, ENTITY_VENDOR);
 
         if ($filter) {
             $query->where(function ($query) use ($filter) {
@@ -62,25 +61,60 @@ class VendorRepository extends BaseRepository
         return $query;
     }
 
-    public function save($data)
+    public function save($data, $vendor = null)
     {
         $publicId = isset($data['public_id']) ? $data['public_id'] : false;
 
-        if (!$publicId || $publicId == '-1') {
+        if ($vendor) {
+            // do nothing
+        } elseif (! $publicId || $publicId == '-1') {
             $vendor = Vendor::createNew();
         } else {
-            $vendor = Vendor::scope($publicId)->with('vendorcontacts')->firstOrFail();
+            $vendor = Vendor::scope($publicId)->with('vendor_contacts')->firstOrFail();
+            if (Utils::isNinjaDev()) {
+                \Log::warning('Entity not set in vendor repo save');
+            }
+        }
+
+        if ($vendor->is_deleted) {
+            return $vendor;
         }
 
         $vendor->fill($data);
         $vendor->save();
 
-        $first              = true;
-        $vendorcontacts     = isset($data['vendorcontact']) ? [$data['vendorcontact']] : $data['vendorcontacts'];
+        $first = true;
+        if (isset($data['vendor_contact'])) {
+            $vendorcontacts = [$data['vendor_contact']];
+        } elseif (isset($data['vendor_contacts'])) {
+            $vendorcontacts = $data['vendor_contacts'];
+        } else {
+            $vendorcontacts = [[]];
+        }
+
+        $vendorcontactIds = [];
+
+        // If the primary is set ensure it's listed first
+        usort($vendorcontacts, function ($left, $right) {
+            if (isset($right['is_primary']) && isset($left['is_primary'])) {
+                return $right['is_primary'] - $left['is_primary'];
+            } else {
+                return 0;
+            }
+        });
 
         foreach ($vendorcontacts as $vendorcontact) {
-            $vendorcontact      = $vendor->addVendorContact($vendorcontact, $first);
-            $first              = false;
+            $vendorcontact = $vendor->addVendorContact($vendorcontact, $first);
+            $vendorcontactIds[] = $vendorcontact->public_id;
+            $first = false;
+        }
+
+        if (! $vendor->wasRecentlyCreated) {
+            foreach ($vendor->vendor_contacts as $contact) {
+                if (! in_array($contact->public_id, $vendorcontactIds)) {
+                    $contact->delete();
+                }
+            }
         }
 
         return $vendor;

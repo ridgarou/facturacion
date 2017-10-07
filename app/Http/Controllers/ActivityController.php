@@ -1,12 +1,7 @@
-<?php namespace App\Http\Controllers;
+<?php
 
-use Auth;
-use DB;
-use Datatable;
-use Utils;
-use View;
-use App\Models\Client;
-use App\Models\Activity;
+namespace App\Http\Controllers;
+
 use App\Services\ActivityService;
 
 class ActivityController extends BaseController

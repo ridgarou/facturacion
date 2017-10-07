@@ -1,41 +1,32 @@
-<?php namespace App\Http\Controllers;
+<?php
 
-use Auth;
-use Datatable;
-use Utils;
-use View;
-use URL;
-use Validator;
-use Input;
-use Session;
-use Redirect;
-use Cache;
+namespace App\Http\Controllers;
 
-use App\Models\Activity;
-use App\Models\Client;
-use App\Models\Account;
-use App\Models\Contact;
-use App\Models\Invoice;
-use App\Models\Size;
-use App\Models\PaymentTerm;
-use App\Models\Industry;
-use App\Models\Currency;
-use App\Models\Payment;
-use App\Models\Credit;
-use App\Models\Expense;
-use App\Models\Country;
-use App\Models\Task;
-use App\Ninja\Repositories\ClientRepository;
-use App\Services\ClientService;
-
+use App\Http\Requests\ClientRequest;
 use App\Http\Requests\CreateClientRequest;
 use App\Http\Requests\UpdateClientRequest;
+use App\Models\Account;
+use App\Models\Client;
+use App\Models\Credit;
+use App\Models\Invoice;
+use App\Models\Task;
+use App\Ninja\Datatables\ClientDatatable;
+use App\Ninja\Repositories\ClientRepository;
+use App\Services\ClientService;
+use Auth;
+use Cache;
+use Input;
+use Redirect;
+use Session;
+use URL;
+use Utils;
+use View;
 
 class ClientController extends BaseController
 {
     protected $clientService;
     protected $clientRepo;
-    protected $model = 'App\Models\Client';
+    protected $entityType = ENTITY_CLIENT;
 
     public function __construct(ClientRepository $clientRepo, ClientService $clientService)
     {
@@ -52,26 +43,20 @@ class ClientController extends BaseController
      */
     public function index()
     {
-        return View::make('list', array(
+        return View::make('list_wrapper', [
             'entityType' => ENTITY_CLIENT,
+            'datatable' => new ClientDatatable(),
             'title' => trans('texts.clients'),
-            'sortCol' => '4',
-            'columns' => Utils::trans([
-              'checkbox',
-              'client',
-              'contact',
-              'email',
-              'date_created',
-              'last_login',
-              'balance',
-              ''
-            ]),
-        ));
+            'statuses' => Client::getStatuses(),
+        ]);
     }
 
     public function getDatatable()
     {
-        return $this->clientService->getDatatable(Input::get('sSearch'));
+        $search = Input::get('sSearch');
+        $userId = Auth::user()->filterId();
+
+        return $this->clientService->getDatatable($search, $userId);
     }
 
     /**
@@ -81,13 +66,7 @@ class ClientController extends BaseController
      */
     public function store(CreateClientRequest $request)
     {
-        $data = $request->input();
-        
-        if(!$this->checkUpdatePermission($data, $response)){
-            return $response;
-        }
-                
-        $client = $this->clientService->save($data);
+        $client = $this->clientService->save($request->input());
 
         Session::flash('message', trans('texts.created_client'));
 
@@ -97,54 +76,59 @@ class ClientController extends BaseController
     /**
      * Display the specified resource.
      *
-     * @param  int      $id
+     * @param int $id
+     *
      * @return Response
      */
-    public function show($publicId)
+    public function show(ClientRequest $request)
     {
-        $client = Client::withTrashed()->scope($publicId)->with('contacts', 'size', 'industry')->firstOrFail();
-        
-        if(!$this->checkViewPermission($client, $response)){
-            return $response;
-        }
-        
-        Utils::trackViewed($client->getDisplayName(), ENTITY_CLIENT);
+        $client = $request->entity();
+        $user = Auth::user();
 
         $actionLinks = [];
-        if(Task::canCreate()){
-            $actionLinks[] = ['label' => trans('texts.new_task'), 'url' => '/tasks/create/'.$client->public_id];
+        if ($user->can('create', ENTITY_INVOICE)) {
+            $actionLinks[] = ['label' => trans('texts.new_invoice'), 'url' => URL::to('/invoices/create/'.$client->public_id)];
         }
-        if (Utils::isPro() && Invoice::canCreate()) {
-            $actionLinks[] = ['label' => trans('texts.new_quote'), 'url' => '/quotes/create/'.$client->public_id];
+        if ($user->can('create', ENTITY_TASK)) {
+            $actionLinks[] = ['label' => trans('texts.new_task'), 'url' => URL::to('/tasks/create/'.$client->public_id)];
         }
-        
-        if(!empty($actionLinks)){
-            $actionLinks[] = \DropdownButton::DIVIDER;
+        if (Utils::hasFeature(FEATURE_QUOTES) && $user->can('create', ENTITY_QUOTE)) {
+            $actionLinks[] = ['label' => trans('texts.new_quote'), 'url' => URL::to('/quotes/create/'.$client->public_id)];
         }
-        
-        if(Payment::canCreate()){
-            $actionLinks[] = ['label' => trans('texts.enter_payment'), 'url' => '/payments/create/'.$client->public_id];
-        }
-        
-        if(Credit::canCreate()){
-            $actionLinks[] = ['label' => trans('texts.enter_credit'), 'url' => '/credits/create/'.$client->public_id];
-        }
-        
-        if(Expense::canCreate()){
-            $actionLinks[] = ['label' => trans('texts.enter_expense'), 'url' => '/expenses/create/0/'.$client->public_id];
+        if ($user->can('create', ENTITY_RECURRING_INVOICE)) {
+            $actionLinks[] = ['label' => trans('texts.new_recurring_invoice'), 'url' => URL::to('/recurring_invoices/create/'.$client->public_id)];
         }
 
-        $data = array(
+        if (! empty($actionLinks)) {
+            $actionLinks[] = \DropdownButton::DIVIDER;
+        }
+
+        if ($user->can('create', ENTITY_PAYMENT)) {
+            $actionLinks[] = ['label' => trans('texts.enter_payment'), 'url' => URL::to('/payments/create/'.$client->public_id)];
+        }
+
+        if ($user->can('create', ENTITY_CREDIT)) {
+            $actionLinks[] = ['label' => trans('texts.enter_credit'), 'url' => URL::to('/credits/create/'.$client->public_id)];
+        }
+
+        if ($user->can('create', ENTITY_EXPENSE)) {
+            $actionLinks[] = ['label' => trans('texts.enter_expense'), 'url' => URL::to('/expenses/create/0/'.$client->public_id)];
+        }
+
+        $token = $client->getGatewayToken();
+
+        $data = [
             'actionLinks' => $actionLinks,
             'showBreadcrumbs' => false,
             'client' => $client,
             'credit' => $client->getTotalCredit(),
             'title' => trans('texts.view_client'),
-            'hasRecurringInvoices' => Invoice::scope()->where('is_recurring', '=', true)->whereClientId($client->id)->count() > 0,
-            'hasQuotes' => Invoice::scope()->where('is_quote', '=', true)->whereClientId($client->id)->count() > 0,
-            'hasTasks' => Task::scope()->whereClientId($client->id)->count() > 0,
-            'gatewayLink' => $client->getGatewayLink(),
-        );
+            'hasRecurringInvoices' => Invoice::scope()->recurring()->withArchived()->whereClientId($client->id)->count() > 0,
+            'hasQuotes' => Invoice::scope()->quotes()->withArchived()->whereClientId($client->id)->count() > 0,
+            'hasTasks' => Task::scope()->withArchived()->whereClientId($client->id)->count() > 0,
+            'gatewayLink' => $token ? $token->gatewayLink() : false,
+            'gatewayName' => $token ? $token->gatewayName() : false,
+        ];
 
         return View::make('clients.show', $data);
     }
@@ -154,14 +138,10 @@ class ClientController extends BaseController
      *
      * @return Response
      */
-    public function create()
+    public function create(ClientRequest $request)
     {
-        if(!$this->checkCreatePermission($response)){
-            return $response;
-        }
-        
         if (Client::scope()->withTrashed()->count() > Auth::user()->getMaxNumClients()) {
-            return View::make('error', ['hideHeader' => true, 'error' => "Sorry, you've exceeded the limit of ".Auth::user()->getMaxNumClients()." clients"]);
+            return View::make('error', ['hideHeader' => true, 'error' => "Sorry, you've exceeded the limit of ".Auth::user()->getMaxNumClients().' clients']);
         }
 
         $data = [
@@ -179,21 +159,18 @@ class ClientController extends BaseController
     /**
      * Show the form for editing the specified resource.
      *
-     * @param  int      $id
+     * @param int $id
+     *
      * @return Response
      */
-    public function edit($publicId)
+    public function edit(ClientRequest $request)
     {
-        $client = Client::scope($publicId)->with('contacts')->firstOrFail();
-        
-        if(!$this->checkEditPermission($client, $response)){
-            return $response;
-        }
-        
+        $client = $request->entity();
+
         $data = [
             'client' => $client,
             'method' => 'PUT',
-            'url' => 'clients/'.$publicId,
+            'url' => 'clients/'.$client->public_id,
             'title' => trans('texts.edit_client'),
         ];
 
@@ -201,7 +178,7 @@ class ClientController extends BaseController
 
         if (Auth::user()->account->isNinjaAccount()) {
             if ($account = Account::whereId($client->public_id)->first()) {
-                $data['proPlanPaid'] = $account['pro_plan_paid'];
+                $data['planDetails'] = $account->getPlanDetails(false, false);
             }
         }
 
@@ -214,11 +191,6 @@ class ClientController extends BaseController
             'data' => Input::old('data'),
             'account' => Auth::user()->account,
             'sizes' => Cache::get('sizes'),
-            'paymentTerms' => Cache::get('paymentTerms'),
-            'industries' => Cache::get('industries'),
-            'currencies' => Cache::get('currencies'),
-            'languages' => Cache::get('languages'),
-            'countries' => Cache::get('countries'),
             'customLabel1' => Auth::user()->account->custom_client_label1,
             'customLabel2' => Auth::user()->account->custom_client_label2,
         ];
@@ -227,18 +199,13 @@ class ClientController extends BaseController
     /**
      * Update the specified resource in storage.
      *
-     * @param  int      $id
+     * @param int $id
+     *
      * @return Response
      */
     public function update(UpdateClientRequest $request)
     {
-        $data = $request->input();
-        
-        if(!$this->checkUpdatePermission($data, $response)){
-            return $response;
-        }
-                
-        $client = $this->clientService->save($data);
+        $client = $this->clientService->save($request->input(), $request->entity());
 
         Session::flash('message', trans('texts.updated_client'));
 
@@ -254,10 +221,56 @@ class ClientController extends BaseController
         $message = Utils::pluralize($action.'d_client', $count);
         Session::flash('message', $message);
 
-        if ($action == 'restore' && $count == 1) {
-            return Redirect::to('clients/'.Utils::getFirst($ids));
-        } else {
-            return Redirect::to('clients');
+        return $this->returnBulk(ENTITY_CLIENT, $action, $ids);
+    }
+
+    public function statement($clientPublicId, $statusId = false, $startDate = false, $endDate = false)
+    {
+        $account = Auth::user()->account;
+        $statusId = intval($statusId);
+        $client = Client::scope(request()->client_id)->with('contacts')->firstOrFail();
+
+        if (! $startDate) {
+            $startDate = Utils::today(false)->modify('-6 month')->format('Y-m-d');
+            $endDate = Utils::today(false)->format('Y-m-d');
         }
+
+        $invoice = $account->createInvoice(ENTITY_INVOICE);
+        $invoice->client = $client;
+        $invoice->date_format = $account->date_format ? $account->date_format->format_moment : 'MMM D, YYYY';
+
+        $invoices = Invoice::scope()
+            ->with(['client'])
+            ->invoices()
+            ->whereClientId($client->id)
+            ->whereIsPublic(true)
+            ->orderBy('invoice_date', 'asc');
+
+        if ($statusId == INVOICE_STATUS_PAID) {
+            $invoices->where('invoice_status_id', '=', INVOICE_STATUS_PAID);
+        } elseif ($statusId == INVOICE_STATUS_UNPAID) {
+            $invoices->where('invoice_status_id', '!=', INVOICE_STATUS_PAID);
+        }
+
+        if ($statusId == INVOICE_STATUS_PAID || ! $statusId) {
+            $invoices->where('invoice_date', '>=', $startDate)
+                    ->where('invoice_date', '<=', $endDate);
+        }
+
+        $invoice->invoice_items = $invoices->get();
+
+        if (request()->json) {
+            return json_encode($invoice);
+        }
+
+        $data = [
+            'showBreadcrumbs' => false,
+            'client' => $client,
+            'account' => $account,
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+        ];
+
+        return view('clients.statement', $data);
     }
 }

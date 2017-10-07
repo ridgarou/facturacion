@@ -1,14 +1,17 @@
-<?php namespace App\Http\Controllers;
+<?php
 
-use App\Http\Middleware\PermissionsRequired;
+namespace App\Http\Controllers;
+
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Bus\DispatchesJobs;
-use Auth;
+use Request;
+use Utils;
 
 class BaseController extends Controller
 {
-    use DispatchesJobs;
-    
-    protected $model = 'App\Models\EntityModel';
+    use DispatchesJobs, AuthorizesRequests;
+
+    protected $entityType;
 
     /**
      * Setup the layout used by the controller.
@@ -21,40 +24,30 @@ class BaseController extends Controller
             $this->layout = View::make($this->layout);
         }
     }
-    
-    protected function checkViewPermission($object, &$response = null){
-        if(!$object->canView()){
-            $response = response('Unauthorized.', 401);
-            return false;
+
+    protected function returnBulk($entityType, $action, $ids)
+    {
+        if (! is_array($ids)) {
+            $ids = [$ids];
         }
-        return true;
-    }
-    
-    protected function checkEditPermission($object, &$response = null){
-        if(!$object->canEdit()){
-            $response = response('Unauthorized.', 401);
-            return false;
-        }
-        return true;
-    }
-    
-    protected function checkCreatePermission(&$response = null){
-        if(!call_user_func(array($this->model, 'canCreate'))){
-            $response = response('Unauthorized.', 401);
-            return false;
-        }
-        return true;
-    }
-    
-    protected function checkUpdatePermission($input, &$response = null){
-        $creating = empty($input['public_id']) || $input['public_id'] == '-1';
-        
-        if($creating){
-            return $this->checkCreatePermission($response);
-        }
-        else{
-            $object = call_user_func(array($this->model, 'scope'), $input['public_id'])->firstOrFail();
-            return $this->checkEditPermission($object, $response);
+
+        $isDatatable = filter_var(request()->datatable, FILTER_VALIDATE_BOOLEAN);
+        $referer = Request::server('HTTP_REFERER');
+        $entityTypes = Utils::pluralizeEntityType($entityType);
+
+        // when restoring redirect to entity
+        if ($action == 'restore' && count($ids) == 1) {
+            return redirect("{$entityTypes}/" . $ids[0]);
+        // when viewing from a datatable list
+        } elseif (strpos($referer, '/clients/')) {
+            return redirect($referer);
+        } elseif ($isDatatable || ($action == 'archive' || $action == 'delete')) {
+            return redirect("{$entityTypes}");
+        // when viewing individual entity
+        } elseif (count($ids)) {
+            return redirect("{$entityTypes}/" . $ids[0] . '/edit');
+        } else {
+            return redirect("{$entityTypes}");
         }
     }
 }
