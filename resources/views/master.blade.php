@@ -129,7 +129,15 @@
 
         /* This causes problems with some languages. ie, fr_CA
          var appLocale = '{{App::getLocale()}}';
-         */
+        */
+         
+        // *** Modificacion de FACTURACION:
+        var appLocale = '{{App::getLocale()}}';
+  
+        $.extend( true, $.fn.datepicker.defaults, {
+			language: appLocale.replace("_", "-")
+        });
+        // *** Fin de modificacion de FACTURACION:
 
         @if (env('FACEBOOK_PIXEL'))
         <!-- Facebook Pixel Code -->

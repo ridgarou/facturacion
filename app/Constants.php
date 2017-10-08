@@ -350,7 +350,9 @@ if (! defined('APP_NAME')) {
     define('DB_NINJA_1', 'db-ninja-1');
     define('DB_NINJA_2', 'db-ninja-2');
 
-    define('COUNT_FREE_DESIGNS', 4);
+    // *** Modificacion de FACTURACION:
+    define('COUNT_FREE_DESIGNS', 6);
+    // *** Fin de Modificacion de FACTURACION:
     define('PRODUCT_ONE_CLICK_INSTALL', 1);
     define('PRODUCT_INVOICE_DESIGNS', 2);
     define('PRODUCT_WHITE_LABEL', 3);

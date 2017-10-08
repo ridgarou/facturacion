@@ -58,9 +58,9 @@ return array(
     "required"         => "El campo :attribute es obligatorio.",
     "required_if"      => "El campo :attribute es obligatorio cuando :other es :value.",
     "required_with"    => "El campo :attribute es obligatorio cuando :values está presente.",
-    "required_with_all" => "The :attribute field is required when :values is present.",
+    "required_with_all" => "El campo :attribute es obligatorio cuando :values están s.",
     "required_without" => "El campo :attribute es obligatorio cuando :values no está presente.",
-    "required_without_all" => "The :attribute field is required when none of :values are present.",
+    "required_without_all" => "El campo :attribute es obligatorio cuando :values no están presentes.",
     "same"             => ":attribute y :other deben coincidir.",
     "size"             => array(
         "numeric" => "El tamaño de :attribute debe ser :size.",
@@ -72,11 +72,11 @@ return array(
     "url"        => "El formato :attribute es inválido.",
     "positive"   => ":attribute debe ser mayor que cero.",
     "has_credit" => "el cliente no tiene crédito suficiente.",
-    "notmasked" => "The values are masked",
-    "less_than" => 'The :attribute must be less than :value',
-    "has_counter" => 'The value must contain {$counter}',
-    "valid_contacts" => "All of the contacts must have either an email or name",
-    "valid_invoice_items" => "The invoice exceeds the maximum amount",
+    "notmasked" => "Los valores estan enmascarados",
+    "less_than" => 'El :attribute debe ser menor que :value',
+    "has_counter" => 'El valor debe contener {$counter}',
+    "valid_contacts" => "Todos los contectos deben tener un email o un nombre",
+    "valid_invoice_items" => "La factura excede el importe máximo",
 
     /*
     |--------------------------------------------------------------------------

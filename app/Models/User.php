@@ -147,7 +147,9 @@ class User extends Authenticatable
      */
     public function maxInvoiceDesignId()
     {
-        return $this->hasFeature(FEATURE_MORE_INVOICE_DESIGNS) ? 13 : COUNT_FREE_DESIGNS;
+        // *** Modificacion de FACTURACION:
+        return 15; // $this->hasFeature(FEATURE_MORE_INVOICE_DESIGNS) ? 15 : COUNT_FREE_DESIGNS;
+        // *** Fin de Modificacion de FACTURACION:
     }
 
     /**
