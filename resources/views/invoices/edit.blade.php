@@ -263,7 +263,6 @@
             @endif
 		</div>
 	</div>
-
 	<div class="table-responsive" style="padding-top:4px;">
 
 		<table class="table invoice-table">
