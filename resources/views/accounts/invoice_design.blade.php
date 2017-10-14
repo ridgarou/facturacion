@@ -83,8 +83,8 @@
 		}
 		invoiceLabels[field] = val || invoiceLabels[field + '_orig'];
       }
-
-      generatePDF(invoice, getDesignJavascript(), true, cb);
+      var designJs = getDesignJavascript();
+      generatePDF(invoice, designJs, true, cb);
     }
 
 	function updateFieldLabels() {

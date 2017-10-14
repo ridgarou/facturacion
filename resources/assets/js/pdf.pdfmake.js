@@ -228,6 +228,10 @@ NINJA.decodeJavascript = function(invoice, javascript)
         'quantityWidth': NINJA.quantityWidth(invoice),
         'taxWidth': NINJA.taxWidth(invoice),
         'clientDetails': NINJA.clientDetails(invoice),
+		// *** Modificacion de FACTURACION:
+		'invoiceNotes' : NINJA.invoiceNotes(invoice),
+		'invoiceTerms' : NINJA.invoiceTerms(invoice),
+		// *** Fin de Modificacion de FACTURACION:
         'notesAndTerms': NINJA.notesAndTerms(invoice),
         'subtotals': invoice.is_statement ? NINJA.statementSubtotals(invoice) : NINJA.subtotals(invoice),
         'subtotalsHeight': (NINJA.subtotals(invoice).length * 16) + 16,
@@ -368,7 +372,31 @@ NINJA.notesAndTerms = function(invoice)
 
     return NINJA.prepareDataList(data, 'notesAndTerms');
 }
+// *** Modificacion de FACTURACION:
+NINJA.invoiceNotes = function(invoice)
+{
+    var data = [];
 
+    if (invoice.public_notes) {
+        data.push({stack:[{text: invoice.is_recurring ? processVariables(invoice.public_notes) : invoice.public_notes, style: ['notes']}]});
+        data.push({text:' '});
+    }
+
+    return NINJA.prepareDataList(data, 'invoiceNotes');
+}
+
+NINJA.invoiceTerms = function(invoice)
+{
+    var data = [];
+
+    if (invoice.terms) {
+        data.push({text:invoiceLabels.terms, style: ['termsLabel']});
+        data.push({stack:[{text: invoice.is_recurring ? processVariables(invoice.terms) : invoice.terms, style: ['terms']}]});
+    }
+
+    return NINJA.prepareDataList(data, 'invoiceTerms');
+}
+// *** Fin de Modificacion de FACTURACION:
 NINJA.statementColumns = function(invoice)
 {
     return ["22%", "22%", "22%", "17%", "17%"];

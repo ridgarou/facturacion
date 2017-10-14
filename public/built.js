@@ -33149,6 +33149,10 @@ NINJA.TEMPLATES = {
 		quantityWidth : NINJA.quantityWidth(t),
 		taxWidth : NINJA.taxWidth(t),
 		clientDetails : NINJA.clientDetails(t),
+		// *** Modificacion de FACTURACION:
+		invoiceNotes : NINJA.invoiceNotes(t),
+		invoiceTerms : NINJA.invoiceTerms(t),
+		// *** Fin de Modificacion de FACTURACION:
 		notesAndTerms : NINJA.notesAndTerms(t),
 		subtotals : t.is_statement ? NINJA.statementSubtotals(t) : NINJA.subtotals(t),
 		subtotalsHeight : 16 * NINJA.subtotals(t).length + 16,
@@ -33211,6 +33215,34 @@ NINJA.TEMPLATES = {
 			}
 		}
 	return e
+// *** Modificacion de FACTURACION:
+}, NINJA.invoiceNotes = function (t) {
+	var e = [];
+	return t.public_notes && (e.push({
+		text : invoiceLabels.notes,
+		style : ["termsLabel"]
+	}), e.push({
+			stack : [{
+					text : t.is_recurring ? processVariables(t.public_notes) : t.public_notes,
+					style : ["notes"]
+				}
+			]
+		})),
+	NINJA.prepareDataList(e, "invoiceNotes")
+}, NINJA.invoiceTerms = function (t) {
+	var e = [];
+	return t.terms && (e.push({
+			text : invoiceLabels.terms,
+			style : ["termsLabel"]
+		}), e.push({
+			stack : [{
+					text : t.is_recurring ? processVariables(t.terms) : t.terms,
+					style : ["terms"]
+				}
+			]
+		})),
+	NINJA.prepareDataList(e, "invoiceTerms")
+// *** Fin de Modificacion de FACTURACION:
 }, NINJA.notesAndTerms = function (t) {
 	var e = [];
 	return t.public_notes && (e.push({

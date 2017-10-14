@@ -214,10 +214,12 @@ if (! defined('APP_NAME')) {
     define('EXPENSE_STATUS_PAID', 5);
     define('EXPENSE_STATUS_UNPAID', 6);
 
-    define('CUSTOM_DESIGN1', 11);
-    define('CUSTOM_DESIGN2', 12);
-    define('CUSTOM_DESIGN3', 13);
-
+    define('CUSTOM_DESIGN1', 13);
+    define('CUSTOM_DESIGN2', 14);
+    define('CUSTOM_DESIGN3', 15);
+    define('CUSTOM_DESIGN4', 16);
+    define('CUSTOM_DESIGN5', 17);
+    
     define('FREQUENCY_WEEKLY', 1);
     define('FREQUENCY_TWO_WEEKS', 2);
     define('FREQUENCY_FOUR_WEEKS', 3);
