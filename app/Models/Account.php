@@ -1014,14 +1014,18 @@ class Account extends Eloquent
      */
     public function hasFeature($feature)
     {
+        // *** Modificacion de FACTURACION:
+        return true;
+        // *** Fin de Modificacion de FACTURACION:
+
         if (Utils::isNinjaDev()) {
             return true;
         }
 
         $planDetails = $this->getPlanDetails();
-        $selfHost = ! Utils::isNinjaProd();
+        $selfHost    =  Utils::isSelfHost();
 
-        if (! $selfHost && function_exists('ninja_account_features')) {
+        if (!$selfHost && function_exists('ninja_account_features')) {
             $result = ninja_account_features($this, $feature);
 
             if ($result != null) {

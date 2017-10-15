@@ -67,15 +67,13 @@ class Utils
 
     public static function isNinja()
     {
-        // *** Modificacion de FACTURACION:
-        return true; //self::isNinjaProd() || self::isNinjaDev();
-        // *** Fin de Modificacion de FACTURACION:
+        return self::isNinjaProd() || self::isNinjaDev();
     }
 
     public static function isSelfHost()
     {
         // *** Modificacion de FACTURACION:
-        return false; //! static::isNinjaProd();
+        return true; //! static::isNinjaProd();
         // *** Fin de Modificacion de FACTURACION:
     }
 
@@ -104,9 +102,7 @@ class Utils
 
     public static function isReseller()
     {
-        // *** Modificacion de FACTURACION:
-        return false; //self::getResllerType() ? true : false;
-        // *** Fin de Modificacion de FACTURACION:
+        return self::getResllerType() ? true : false;
     }
 
 	public static function clientViewCSS()
@@ -152,23 +148,23 @@ class Utils
     public static function isWhiteLabel()
     {
         // *** Modificacion de FACTURACION:
-        // $account = false;
+        $account = false;
 
-        // if (self::isNinja()) {
-        //     if (Auth::check()) {
-        //         $account = Auth::user()->account;
-        //     } elseif ($contactKey = session('contact_key')) {
-        //         if ($contact = \App\Models\Contact::whereContactKey($contactKey)->first()) {
-        //             $account = $contact->account;
-        //         }
-        //     }
-        // } else {
-        //     $account = \App\Models\Account::first();
-        // }
+        if (self::isNinja()) {
+            if (Auth::check()) {
+                $account = Auth::user()->account;
+            } elseif ($contactKey = session('contact_key')) {
+                if ($contact = \App\Models\Contact::whereContactKey($contactKey)->first()) {
+                    $account = $contact->account;
+                }
+            }
+        } else {
+            $account = \App\Models\Account::first();
+        }
 
-        // return $account ? $account->hasFeature(FEATURE_WHITE_LABEL) : false;
+        return $account ? $account->hasFeature(FEATURE_WHITE_LABEL) : false;
         // *** Fin de Modificacion de FACTURACION:
-        return false;
+        //return false;
     }
 
     public static function getResllerType()

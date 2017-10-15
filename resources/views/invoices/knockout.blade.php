@@ -410,7 +410,7 @@ function InvoiceModel(data) {
     self.totals.discounted = ko.computed(function() {
         return self.formatMoney(self.totals.rawDiscounted());
     });
-
+    // *** Modificacion de FACTURACION:
     self.totals.taxAmount = ko.computed(function() {
         var total = self.totals.rawSubtotal();
         var discount = self.totals.rawDiscounted();
@@ -418,25 +418,53 @@ function InvoiceModel(data) {
 
         var customValue1 = roundToTwo(self.custom_value1());
         var customValue2 = roundToTwo(self.custom_value2());
-        var customTaxes1 = self.custom_taxes1() == 1;
-        var customTaxes2 = self.custom_taxes2() == 1;
+        //var customTaxes1 = self.custom_taxes1() == 1;
+        //var customTaxes2 = self.custom_taxes2() == 1;
 
         if (customValue1 && customTaxes1) {
             total = NINJA.parseFloat(total) + customValue1;
         }
-        if (customValue2 && customTaxes2) {
-            total = NINJA.parseFloat(total) + customValue2;
-        }
+        //if (customValue2 && customTaxes2) {
+        //    total = NINJA.parseFloat(total) + customValue2;
+        //}
 
         var taxRate1 = parseFloat(self.tax_rate1());
         var tax1 = roundToTwo(total * (taxRate1/100));
 
+        //var taxRate2 = parseFloat(self.tax_rate2());
+        //var tax2 = roundToTwo(total * (taxRate2/100));
+
+        //return self.formatMoney(tax1 + tax2);
+        return self.formatMoney(tax1);
+    });
+
+    self.totals.taxAmount2 = ko.computed(function() {
+        var total = self.totals.rawSubtotal();
+        var discount = self.totals.rawDiscounted();
+        total -= discount;
+
+        //var customValue1 = roundToTwo(self.custom_value1());
+        var customValue2 = roundToTwo(self.custom_value2());
+        //var customTaxes1 = self.custom_taxes1() == 1;
+        var customTaxes2 = self.custom_taxes2() == 1;
+
+        //if (customValue1 && customTaxes1) {
+        //    total = NINJA.parseFloat(total) + customValue1;
+        //}
+        if (customValue2 && customTaxes2) {
+            total = NINJA.parseFloat(total) + customValue2;
+        }
+
+        //var taxRate1 = parseFloat(self.tax_rate1());
+        //var tax1 = roundToTwo(total * (taxRate1/100));
+
         var taxRate2 = parseFloat(self.tax_rate2());
         var tax2 = roundToTwo(total * (taxRate2/100));
 
-        return self.formatMoney(tax1 + tax2);
+        //return self.formatMoney(tax1 + tax2);
+        return self.formatMoney(tax2);
     });
-
+    // *** Fin de Modificacion de FACTURACION:
     self.totals.itemTaxes = ko.computed(function() {
         var taxes = {};
         var total = self.totals.rawSubtotal();

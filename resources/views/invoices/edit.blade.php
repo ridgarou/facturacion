@@ -408,7 +408,7 @@
                 <td style="min-width:120px"><span data-bind="html: totals.itemTaxRates"/></td>
                 <td style="text-align: right"><span data-bind="html: totals.itemTaxAmounts"/></td>
             </tr>
-
+            <!-- // *** Modificacion de FACTURACION: -->
 			<tr style="display:none" data-bind="visible: $root.invoice_taxes.show">
 				<td class="hide-border" colspan="3"/>
 				<td style="display:none" class="hide-border" data-bind="visible: $root.invoice_item_taxes.show"/>
@@ -425,20 +425,28 @@
                             ->raw() !!}
                     <input type="text" name="tax_name1" data-bind="value: tax_name1" style="display:none">
                     <input type="text" name="tax_rate1" data-bind="value: tax_rate1" style="display:none">
-                    <div data-bind="visible: $root.invoice().account.enable_second_tax_rate == '1'">
+                </td>
+				<td style="text-align: right"><span data-bind="text: totals.taxAmount"/></td>
+			</tr>
+			<tr style="display:none" data-bind="visible: $root.invoice_item_taxes.show &amp;&amp; $root.invoice().account.enable_second_tax_rate == '1'">
+                <td class="hide-border" colspan="3"/>
+				<td style="display:none" class="hide-border" data-bind="visible: $root.invoice_item_taxes.show"/>
+				@if (!$account->hide_quantity)
+					<td>{{ trans('texts.tax') }}</td>
+				@endif
+				<td style="min-width:120px">
                     {!! Former::select('')
                             ->addOption('', '')
                             ->options($taxRateOptions)
                             ->addClass('tax-select')
                             ->data_bind('value: tax2, event:{change:onTax2Change}')
                             ->raw() !!}
-                    </div>
                     <input type="text" name="tax_name2" data-bind="value: tax_name2" style="display:none">
                     <input type="text" name="tax_rate2" data-bind="value: tax_rate2" style="display:none">
                 </td>
-				<td style="text-align: right"><span data-bind="text: totals.taxAmount"/></td>
+                <td style="text-align: right"><span data-bind="text: totals.taxAmount2"/></td>
 			</tr>
-
+            <!-- // *** Fin de Modificacion de FACTURACION: -->
             @if ($account->showCustomField('custom_invoice_label1', $invoice) && !$invoice->custom_taxes1)
 				<tr>
 					<td class="hide-border" colspan="3"/>
