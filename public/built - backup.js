@@ -201,6 +201,8 @@ function calculateAmounts(t) {
 	n = !1,
 	i = {};
 	t.has_product_key = !1,
+	t.has_custom_item_value1 = !1,
+	t.has_custom_item_value2 = !1,
 	2 == t.invoice_design_id && (t.has_product_key = !0);
 	for (var o = !1, a = !1, s = 0; s < t.invoice_items.length; s++) {
 		var r = t.invoice_items[s],
@@ -219,6 +221,7 @@ function calculateAmounts(t) {
 		h = 0,
 		d = "";
 		r.product_key ? t.has_product_key = !0 : 1 != t.invoice_items.length || r.qty || (t.has_product_key = !0),
+		t.features.invoice_settings && (r.custom_value1 && (t.has_custom_item_value1 = !0), r.custom_value2 && (t.has_custom_item_value2 = !0)),
 		0 != parseFloat(r.tax_rate1) && (l = parseFloat(r.tax_rate1), u = r.tax_name1),
 		0 != parseFloat(r.tax_rate2) && (h = parseFloat(r.tax_rate2), d = r.tax_name2);
 		var c = roundToFour(NINJA.parseFloat(r.cost)) * roundToFour(NINJA.parseFloat(r.qty));
@@ -480,6 +483,11 @@ function pad(t, e, n) {
 	return n = n || "0",
 	t += "",
 	t.length >= e ? t : new Array(e - t.length + 1).join(n) + t
+}
+function brewerColor(t) {
+	var e = ["#1c9f77", "#d95d02", "#716cb1", "#e62a8b", "#5fa213", "#e6aa04", "#a87821", "#676767"],
+	t = (t - 1) % e.length;
+	return e[t]
 }
 function GetPdfMake(t, e, n) {
 	function i(e, n) {
@@ -2839,7 +2847,8 @@ if (function (t, e) {
 										selector : o,
 										needsContext : o && ot.expr.match.needsContext.test(o),
 										namespace : f.join(".")
-									}, c), (d = s[p]) || (d = s[p] = [], d.delegateCount = 0, l.setup && l.setup.call(t, i, f, u) !== !1 || (t.addEventListener ? t.addEventListener(p, u, !1) : t.attachEvent && t.attachEvent("on" + p, u))), l.add && (l.add.call(t, h), h.handler.guid || (h.handler.guid = n.guid)), o ? d.splice(d.delegateCount++, 0, h) : d.push(h), ot.event.global[p] = !0);
+									}, c), (d = s[p]) || (d = s[p] = [], d.delegateCount = 0, l.setup && l.setup.call(t, i, f, u) !== !1 || (t.addEventListener ? t.addEventListener(p, u, !1) : t.attachEvent && t.attachEvent("on" + p, u))),
+								l.add && (l.add.call(t, h), h.handler.guid || (h.handler.guid = n.guid)), o ? d.splice(d.delegateCount++, 0, h) : d.push(h), ot.event.global[p] = !0);
 						t = null
 					}
 				},
@@ -4090,6 +4099,7 @@ if (function (t, e) {
 							this[t] = void 0,
 							delete this[t]
 						} catch (e) {}
+
 					})
 				}
 			}),
@@ -5433,8 +5443,7 @@ if (function (t, e) {
 						var n = this,
 						i = 1 === e.which,
 						o = !("string" != typeof this.options.cancel || !e.target.nodeName) && t(e.target).closest(this.options.cancel).length;
-						return !(i && !o && this._mouseCapture(e)) || (this.mouseDelayMet = !this.options.delay,
-							this.mouseDelayMet || (this._mouseDelayTimer = setTimeout(function () {
+						return !(i && !o && this._mouseCapture(e)) || (this.mouseDelayMet = !this.options.delay, this.mouseDelayMet || (this._mouseDelayTimer = setTimeout(function () {
 										n.mouseDelayMet = !0
 									}, this.options.delay)), this._mouseDistanceMet(e) && this._mouseDelayMet(e) && (this._mouseStarted = this._mouseStart(e) !== !1, !this._mouseStarted) ? (e.preventDefault(), !0) : (!0 === t.data(e.target, this.widgetName + ".preventClickEvent") && t.removeData(e.target, this.widgetName + ".preventClickEvent"), this._mouseMoveDelegate = function (t) {
 								return n._mouseMove(t)
@@ -6616,7 +6625,7 @@ if (function (t, e) {
 				},
 				_resizeMenu : function () {
 					var t = this.menu.element;
-					t.outerWidth(Math.max(t.width("").outerWidth() + 1, this.element.outerWidth()))
+					t.outerWidth(Math.max(t.width("").outerWidth() + 1, this.element.outerWidth()));
 				},
 				_renderMenu : function (e, n) {
 					var i = this;
@@ -6625,7 +6634,7 @@ if (function (t, e) {
 					})
 				},
 				_renderItemData : function (t, e) {
-					return this._renderItem(t, e).data("ui-autocomplete-item", e);
+					return this._renderItem(t, e).data("ui-autocomplete-item", e)
 				},
 				_renderItem : function (e, n) {
 					return t("<li>").text(n.label).appendTo(e)
@@ -7647,8 +7656,7 @@ if (function (t, e) {
 					Z = t.drawMonth - V,
 					tt = t.drawYear;
 					if (Z < 0 && (Z += 12, tt--), Q)
-						for (e = this._daylightSavingAdjust(new Date(Q.getFullYear(), Q.getMonth() - $[0] * $[1] + 1, Q.getDate())),
-							e = G && e < G ? G : e; this._daylightSavingAdjust(new Date(tt, Z, 1)) > e; )
+						for (e = this._daylightSavingAdjust(new Date(Q.getFullYear(), Q.getMonth() - $[0] * $[1] + 1, Q.getDate())), e = G && e < G ? G : e; this._daylightSavingAdjust(new Date(tt, Z, 1)) > e; )
 							Z--, Z < 0 && (Z = 11, tt--);
 					for (t.drawMonth = Z, t.drawYear = tt, n = this._get(t, "prevText"), n = U ? this.formatDate(n, this._daylightSavingAdjust(new Date(tt, Z - Y, 1)), this._getFormatConfig(t)) : n, i = this._canAdjustMonth(t, -1, tt, Z) ? "<a class='ui-datepicker-prev ui-corner-all' data-handler='prev' data-event='click' title='" + n + "'><span class='ui-icon ui-icon-circle-triangle-" + (F ? "e" : "w") + "'>" + n + "</span></a>" : j ? "" : "<a class='ui-datepicker-prev ui-corner-all ui-state-disabled' title='" + n + "'><span class='ui-icon ui-icon-circle-triangle-" + (F ? "e" : "w") + "'>" + n + "</span></a>", o = this._get(t, "nextText"), o = U ? this.formatDate(o, this._daylightSavingAdjust(new Date(tt, Z + Y, 1)), this._getFormatConfig(t)) : o, a = this._canAdjustMonth(t, 1, tt, Z) ? "<a class='ui-datepicker-next ui-corner-all' data-handler='next' data-event='click' title='" + o + "'><span class='ui-icon ui-icon-circle-triangle-" + (F ? "w" : "e") + "'>" + o + "</span></a>" : j ? "" : "<a class='ui-datepicker-next ui-corner-all ui-state-disabled' title='" + o + "'><span class='ui-icon ui-icon-circle-triangle-" + (F ? "w" : "e") + "'>" + o + "</span></a>", s = this._get(t, "currentText"), r = this._get(t, "gotoCurrent") && t.currentDay ? K : R, s = U ? this.formatDate(s, r, this._getFormatConfig(t)) : s, c = t.inline ? "" : "<button type='button' class='ui-datepicker-close ui-state-default ui-priority-primary ui-corner-all' data-handler='hide' data-event='click'>" + this._get(t, "closeText") + "</button>", l = H ? "<div class='ui-datepicker-buttonpane ui-widget-content'>" + (F ? c : "") + (this._isInRange(t, r) ? "<button type='button' class='ui-datepicker-current ui-state-default ui-priority-secondary ui-corner-all' data-handler='today' data-event='click'>" + s + "</button>" : "") + (F ? "" : c) + "</div>" : "", u = parseInt(this._get(t, "firstDay"), 10), u = isNaN(u) ? 0 : u, h = this._get(t, "showWeek"), d = this._get(t, "dayNames"), p = this._get(t, "dayNamesMin"), f = this._get(t, "monthNames"), m = this._get(t, "monthNamesShort"), g = this._get(t, "beforeShowDay"), b = this._get(t, "showOtherMonths"), v = this._get(t, "selectOtherMonths"), M = this._getDefaultDate(t), y = "", _ = 0; _ < $[0]; _++) {
 						for (z = "", this.maxRows = 4, T = 0; T < $[1]; T++) {
@@ -8387,8 +8395,7 @@ if (function (t, e) {
 					i,
 					o = !1;
 					for (n in this.handles)
-						i = t(this.handles[n])[0],
-						(i === e.target || t.contains(i, e.target)) && (o = !0);
+						i = t(this.handles[n])[0], (i === e.target || t.contains(i, e.target)) && (o = !0);
 					return !this.options.disabled && o
 				},
 				_mouseStart : function (e) {
@@ -9538,7 +9545,7 @@ if (function (t, e) {
 						if (r)
 							return a = n[c](r), n[u[c].cache] = a[u[c].cache], i = n._rgba = a._rgba, !1
 					}),
-					i.length ? ("0,0,0,0" === i.join() && t.extend(i, a.transparent), n) : a[e]
+					i.length ? ("0,0,0,0" === i.join() && t.extend(i, a.transparent), n) : a[e];
 				}
 				function o(t, e, n) {
 					return n = (n + 1) % 1,
@@ -29937,6 +29944,96 @@ if (function (t, e) {
 	}),
 	t
 }), function (t, e) {
+	"use strict";
+	"function" == typeof define && define.amd ? define("stacktrace", ["error-stack-parser", "stack-generator", "stacktrace-gps"], e) : "object" == typeof exports ? module.exports = e(require("error-stack-parser"), require("stack-generator"), require("stacktrace-gps")) : t.StackTrace = e(t.ErrorStackParser, t.StackGenerator, t.StackTraceGPS)
+}
+(this, function (t, e, n) {
+	function i(t, e) {
+		var n = {};
+		return [t, e].forEach(function (t) {
+			for (var e in t)
+				t.hasOwnProperty(e) && (n[e] = t[e]);
+			return n
+		}),
+		n
+	}
+	function o(t) {
+		return t.stack || t["opera#sourceloc"]
+	}
+	var a = {
+		filter : function (t) {
+			return (t.functionName || "").indexOf("StackTrace$$") === -1 && (t.functionName || "").indexOf("ErrorStackParser$$") === -1 && (t.functionName || "").indexOf("StackTraceGPS$$") === -1 && (t.functionName || "").indexOf("StackGenerator$$") === -1
+		}
+	};
+	return {
+		get : function (t) {
+			try {
+				throw new Error
+			} catch (e) {
+				return o(e) ? this.fromError(e, t) : this.generateArtificially(t)
+			}
+		},
+		fromError : function (e, o) {
+			return o = i(a, o),
+			new Promise(function (i) {
+				var a = t.parse(e);
+				"function" == typeof o.filter && (a = a.filter(o.filter)),
+				i(Promise.all(a.map(function (t) {
+							return new Promise(function (e) {
+								function i() {
+									e(t)
+								}
+								new n(o).pinpoint(t).then(e, i)["catch"](i)
+							})
+						})))
+			}
+				.bind(this))
+		},
+		generateArtificially : function (t) {
+			t = i(a, t);
+			var n = e.backtrace(t);
+			return "function" == typeof t.filter && (n = n.filter(t.filter)),
+			Promise.resolve(n)
+		},
+		instrument : function (t, e, n, i) {
+			if ("function" != typeof t)
+				throw new Error("Cannot instrument non-function object");
+			if ("function" == typeof t.__stacktraceOriginalFn)
+				return t;
+			var a = function () {
+				try {
+					return this.get().then(e, n)["catch"](n),
+					t.apply(i || this, arguments)
+				} catch (a) {
+					throw o(a) && this.fromError(a).then(e, n)["catch"](n),
+					a
+				}
+			}
+			.bind(this);
+			return a.__stacktraceOriginalFn = t,
+			a
+		},
+		deinstrument : function (t) {
+			if ("function" != typeof t)
+				throw new Error("Cannot de-instrument non-function object");
+			return "function" == typeof t.__stacktraceOriginalFn ? t.__stacktraceOriginalFn : t
+		},
+		report : function (t, e) {
+			return new Promise(function (n, i) {
+				var o = new XMLHttpRequest;
+				o.onerror = i,
+				o.onreadystatechange = function () {
+					4 === o.readyState && (o.status >= 200 && o.status < 400 ? n(o.responseText) : i(new Error("POST to " + e + " failed with status: " + o.status)))
+				},
+				o.open("post", e),
+				o.setRequestHeader("Content-Type", "application/json"),
+				o.send(JSON.stringify({
+						stack : t
+					}))
+			})
+		}
+	}
+}), function (t, e) {
 	"object" == typeof exports && "undefined" != typeof module ? module.exports = e() : "function" == typeof define && define.amd ? define(e) : t.ES6Promise = e()
 }
 (this, function () {
@@ -31039,7 +31136,8 @@ if (function (t, e) {
 		t.showConfirmButton || t.showCancelButton ? q(T) : W(T),
 		s.innerHTML = t.confirmButtonText,
 		r.innerHTML = t.cancelButtonText,
-		t.buttonsStyling && (s.style.backgroundColor = t.confirmButtonColor, r.style.backgroundColor = t.cancelButtonColor),
+		t.buttonsStyling && (s.style.backgroundColor = t.confirmButtonColor,
+			r.style.backgroundColor = t.cancelButtonColor),
 		s.className = l.confirm,
 		L(s, t.confirmButtonClass),
 		r.className = l.cancel,
@@ -32375,6 +32473,314 @@ if (function (t, e) {
 	}
 }
 ("undefined" != typeof window ? window : null, "undefined" != typeof window ? document : null), function (t) {
+	t(["jquery"], function (t) {
+		return function () {
+			function e(t, e, n) {
+				return f({
+					type : A.error,
+					iconClass : m().iconClasses.error,
+					message : t,
+					optionsOverride : n,
+					title : e
+				})
+			}
+			function n(e, n) {
+				return e || (e = m()),
+				b = t("#" + e.containerId),
+				b.length ? b : (n && (b = h(e)), b)
+			}
+			function i(t, e, n) {
+				return f({
+					type : A.info,
+					iconClass : m().iconClasses.info,
+					message : t,
+					optionsOverride : n,
+					title : e
+				})
+			}
+			function o(t) {
+				v = t
+			}
+			function a(t, e, n) {
+				return f({
+					type : A.success,
+					iconClass : m().iconClasses.success,
+					message : t,
+					optionsOverride : n,
+					title : e
+				})
+			}
+			function s(t, e, n) {
+				return f({
+					type : A.warning,
+					iconClass : m().iconClasses.warning,
+					message : t,
+					optionsOverride : n,
+					title : e
+				})
+			}
+			function r(t, e) {
+				var i = m();
+				b || n(i),
+				u(t, i, e) || l(i)
+			}
+			function c(e) {
+				var i = m();
+				return b || n(i),
+				e && 0 === t(":focus", e).length ? void g(e) : void(b.children().length && b.remove())
+			}
+			function l(e) {
+				for (var n = b.children(), i = n.length - 1; i >= 0; i--)
+					u(t(n[i]), e)
+			}
+			function u(e, n, i) {
+				var o = !(!i || !i.force) && i.force;
+				return !(!e || !o && 0 !== t(":focus", e).length) && (e[n.hideMethod]({
+						duration : n.hideDuration,
+						easing : n.hideEasing,
+						complete : function () {
+							g(e)
+						}
+					}), !0)
+			}
+			function h(e) {
+				return b = t("<div/>").attr("id", e.containerId).addClass(e.positionClass),
+				b.appendTo(t(e.target)),
+				b
+			}
+			function d() {
+				return {
+					tapToDismiss : !0,
+					toastClass : "toast",
+					containerId : "toast-container",
+					debug : !1,
+					showMethod : "fadeIn",
+					showDuration : 300,
+					showEasing : "swing",
+					onShown : void 0,
+					hideMethod : "fadeOut",
+					hideDuration : 1e3,
+					hideEasing : "swing",
+					onHidden : void 0,
+					closeMethod : !1,
+					closeDuration : !1,
+					closeEasing : !1,
+					closeOnHover : !0,
+					extendedTimeOut : 1e3,
+					iconClasses : {
+						error : "toast-error",
+						info : "toast-info",
+						success : "toast-success",
+						warning : "toast-warning"
+					},
+					iconClass : "toast-info",
+					positionClass : "toast-top-right",
+					timeOut : 5e3,
+					titleClass : "toast-title",
+					messageClass : "toast-message",
+					escapeHtml : !1,
+					target : "body",
+					closeHtml : '<button type="button">&times;</button>',
+					closeClass : "toast-close-button",
+					newestOnTop : !0,
+					preventDuplicates : !1,
+					progressBar : !1,
+					progressClass : "toast-progress",
+					rtl : !1
+				}
+			}
+			function p(t) {
+				v && v(t)
+			}
+			function f(e) {
+				function i(t) {
+					return null == t && (t = ""),
+					t.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+				}
+				function o() {
+					c(),
+					u(),
+					h(),
+					d(),
+					f(),
+					v(),
+					l(),
+					a()
+				}
+				function a() {
+					var t = "";
+					switch (e.iconClass) {
+					case "toast-success":
+					case "toast-info":
+						t = "polite";
+						break;
+					default:
+						t = "assertive"
+					}
+					S.attr("aria-live", t)
+				}
+				function s() {
+					C.closeOnHover && S.hover(T, z),
+					!C.onclick && C.tapToDismiss && S.click(_),
+					C.closeButton && k && k.click(function (t) {
+						t.stopPropagation ? t.stopPropagation() : void 0 !== t.cancelBubble && t.cancelBubble !== !0 && (t.cancelBubble = !0),
+						C.onCloseClick && C.onCloseClick(t),
+						_(!0)
+					}),
+					C.onclick && S.click(function (t) {
+						C.onclick(t),
+						_()
+					})
+				}
+				function r() {
+					S.hide(),
+					S[C.showMethod]({
+						duration : C.showDuration,
+						easing : C.showEasing,
+						complete : C.onShown
+					}),
+					C.timeOut > 0 && (N = setTimeout(_, C.timeOut), q.maxHideTime = parseFloat(C.timeOut), q.hideEta = (new Date).getTime() + q.maxHideTime, C.progressBar && (q.intervalId = setInterval(w, 10)))
+				}
+				function c() {
+					e.iconClass && S.addClass(C.toastClass).addClass(O)
+				}
+				function l() {
+					C.newestOnTop ? b.prepend(S) : b.append(S)
+				}
+				function u() {
+					if (e.title) {
+						var t = e.title;
+						C.escapeHtml && (t = i(e.title)),
+						x.append(t).addClass(C.titleClass),
+						S.append(x)
+					}
+				}
+				function h() {
+					if (e.message) {
+						var t = e.message;
+						C.escapeHtml && (t = i(e.message)),
+						L.append(t).addClass(C.messageClass),
+						S.append(L)
+					}
+				}
+				function d() {
+					C.closeButton && (k.addClass(C.closeClass).attr("role", "button"), S.prepend(k))
+				}
+				function f() {
+					C.progressBar && (D.addClass(C.progressClass), S.prepend(D))
+				}
+				function v() {
+					C.rtl && S.addClass("rtl")
+				}
+				function A(t, e) {
+					if (t.preventDuplicates) {
+						if (e.message === M)
+							return !0;
+						M = e.message
+					}
+					return !1
+				}
+				function _(e) {
+					var n = e && C.closeMethod !== !1 ? C.closeMethod : C.hideMethod,
+					i = e && C.closeDuration !== !1 ? C.closeDuration : C.hideDuration,
+					o = e && C.closeEasing !== !1 ? C.closeEasing : C.hideEasing;
+					if (!t(":focus", S).length || e)
+						return clearTimeout(q.intervalId), S[n]({
+							duration : i,
+							easing : o,
+							complete : function () {
+								g(S),
+								clearTimeout(N),
+								C.onHidden && "hidden" !== W.state && C.onHidden(),
+								W.state = "hidden",
+								W.endTime = new Date,
+								p(W)
+							}
+						})
+				}
+				function z() {
+					(C.timeOut > 0 || C.extendedTimeOut > 0) && (N = setTimeout(_, C.extendedTimeOut), q.maxHideTime = parseFloat(C.extendedTimeOut), q.hideEta = (new Date).getTime() + q.maxHideTime)
+				}
+				function T() {
+					clearTimeout(N),
+					q.hideEta = 0,
+					S.stop(!0, !0)[C.showMethod]({
+						duration : C.showDuration,
+						easing : C.showEasing
+					})
+				}
+				function w() {
+					var t = (q.hideEta - (new Date).getTime()) / q.maxHideTime * 100;
+					D.width(t + "%")
+				}
+				var C = m(),
+				O = e.iconClass || C.iconClass;
+				if ("undefined" != typeof e.optionsOverride && (C = t.extend(C, e.optionsOverride), O = e.optionsOverride.iconClass || O), !A(C, e)) {
+					y++,
+					b = n(C, !0);
+					var N = null,
+					S = t("<div/>"),
+					x = t("<div/>"),
+					L = t("<div/>"),
+					D = t("<div/>"),
+					k = t(C.closeHtml),
+					q = {
+						intervalId : null,
+						hideEta : null,
+						maxHideTime : null
+					},
+					W = {
+						toastId : y,
+						state : "visible",
+						startTime : new Date,
+						options : C,
+						map : e
+					};
+					return o(),
+					r(),
+					s(),
+					p(W),
+					C.debug && console,
+					S
+				}
+			}
+			function m() {
+				return t.extend({}, d(), _.options)
+			}
+			function g(t) {
+				b || (b = n()),
+				t.is(":visible") || (t.remove(), t = null, 0 === b.children().length && (b.remove(), M = void 0))
+			}
+			var b,
+			v,
+			M,
+			y = 0,
+			A = {
+				error : "error",
+				info : "info",
+				success : "success",
+				warning : "warning"
+			},
+			_ = {
+				clear : r,
+				remove : c,
+				error : e,
+				getContainer : n,
+				info : i,
+				options : {},
+				subscribe : o,
+				success : a,
+				version : "2.1.3",
+				warning : s
+			};
+			return _
+		}
+		()
+	})
+}
+("function" == typeof define && define.amd ? define : function (t, e) {
+	"undefined" != typeof module && module.exports ? module.exports = e(require("jquery")) : window.toastr = e(window.jQuery)
+}), function (t) {
 	"use strict";
 	function e() {}
 
@@ -32921,7 +33327,7 @@ if (function (t, e) {
 	t.fn.combobox.Constructor = e
 }
 (window.jQuery);
-var isOpera = !!window.opera || navigator.userAgent.indexOf(" OPR/") >= 0, isFirefox = "undefined" != typeof InstallTrigger, isSafari = Object.prototype.toString.call(window.HTMLElement).indexOf("Constructor") > 0, isEdge = navigator.userAgent.indexOf("Edge/") >= 0, isChrome = !!window.chrome && !isOpera && !isEdge, isChromium = isChrome && navigator.userAgent.indexOf("Chromium") >= 0, isChrome48 = isChrome && navigator.userAgent.indexOf("Chrome/48") >= 0, isIE = !!document.documentMode, isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent), refreshTimer;
+var isOpera = !!window.opera || navigator.userAgent.indexOf(" OPR/") >= 0, isFirefox = "undefined" != typeof InstallTrigger, isSafari = Object.prototype.toString.call(window.HTMLElement).indexOf("Constructor") > 0, isEdge = navigator.userAgent.indexOf("Edge/") >= 0, isChrome = !!window.chrome && !isOpera && !isEdge, isChromium = isChrome && navigator.userAgent.indexOf("Chromium") >= 0, isChrome48 = isChrome && navigator.userAgent.indexOf("Chrome/48") >= 0, isIE = !!document.documentMode, isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent), isAndroid = /Android/i.test(navigator.userAgent), isIPhone = /iPhone|iPad|iPod/i.test(navigator.userAgent), refreshTimer;
 $.fn.selectRange = function (t, e) {
 	var n = document.getElementById($(this).attr("id"));
 	if (n)
@@ -33316,8 +33722,8 @@ NINJA.TEMPLATES = {
 	n = [];
 	t.has_product_key && n.push("15%"),
 	n.push("*"),
-	t.features.invoice_settings && e.custom_invoice_item_label1 && n.push("10%"),
-	t.features.invoice_settings && e.custom_invoice_item_label2 && n.push("10%");
+	t.has_custom_item_value1 && n.push("10%"),
+	t.has_custom_item_value2 && n.push("10%");
 	var i = 3;
 	"1" == e.hide_quantity && (i -= 2),
 	"1" == e.show_item_taxes && i++;
@@ -33349,11 +33755,11 @@ NINJA.TEMPLATES = {
 		text : invoiceLabels.description,
 		style : c.concat("descriptionTableHeader")
 	}),
-	t.features.invoice_settings && n.custom_invoice_item_label1 && r[0].push({
+	t.has_custom_item_value1 && r[0].push({
 		text : n.custom_invoice_item_label1,
 		style : c.concat("custom1TableHeader")
 	}),
-	t.features.invoice_settings && n.custom_invoice_item_label2 && r[0].push({
+	t.has_custom_item_value2 && r[0].push({
 		text : n.custom_invoice_item_label2,
 		style : c.concat("custom2TableHeader")
 	}),
@@ -33375,7 +33781,7 @@ NINJA.TEMPLATES = {
 	for (var l = 0; l < t.invoice_items.length; l++) {
 		var u = [],
 		h = t.invoice_items[l],
-		d = formatMoneyInvoice(h.cost, t, "none", getPrecision(h.cost)),
+		d = formatMoneyInvoice(h.cost, t, null, getPrecision(h.cost)),
 		p = NINJA.parseFloat(h.qty) ? roundSignificant(NINJA.parseFloat(h.qty)) + "" : "",
 		f = h.notes,
 		m = h.product_key,
@@ -33388,7 +33794,7 @@ NINJA.TEMPLATES = {
 				continue
 		} else if (2 == h.invoice_item_type_id)
 			continue;
-		if (a && (0 != parseFloat(h.tax_rate1) && (g = parseFloat(h.tax_rate1)), 0 != parseFloat(h.tax_rate2) && (b = parseFloat(h.tax_rate2))), !i || f || m || d && "0" != d && "0.00" != d && "0,00" != d) {
+		if (a && (0 != parseFloat(h.tax_rate1) && (g = parseFloat(h.tax_rate1)), 0 != parseFloat(h.tax_rate2) && (b = parseFloat(h.tax_rate2))), !i || f || m || h.cost) {
 			i = !0,
 			t.is_recurring && (f = processVariables(f), m = processVariables(m), v = processVariables(h.custom_value1), M = processVariables(h.custom_value2));
 			var y = roundSignificant(NINJA.parseFloat(h.cost)) * roundSignificant(NINJA.parseFloat(h.qty));
@@ -33408,10 +33814,10 @@ NINJA.TEMPLATES = {
 							text : f || " "
 						}
 					]
-				}), t.features.invoice_settings && n.custom_invoice_item_label1 && u.push({
+				}), t.has_custom_item_value1 && u.push({
 					style : ["customValue1", rowStyle],
 					text : v || " "
-				}), t.features.invoice_settings && n.custom_invoice_item_label2 && u.push({
+				}), t.has_custom_item_value2 && u.push({
 					style : ["customValue2", rowStyle],
 					text : M || " "
 				}), o || (u.push({
@@ -33693,7 +34099,8 @@ NINJA.TEMPLATES = {
 	else if ("account.company_name" == e)
 		c = o.name;
 	else if ("account.id_number" == e)
-		c = o.id_number, invoiceLabels.id_number_orig && (r = invoiceLabels.id_number);
+		c = o.id_number,
+		invoiceLabels.id_number_orig && (r = invoiceLabels.id_number);
 	else if ("account.vat_number" == e)
 		c = o.vat_number, invoiceLabels.vat_number_orig && (r = invoiceLabels.vat_number);
 	else if ("account.website" == e)
