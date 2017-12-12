@@ -16,7 +16,10 @@
 @endsection
 
 @section('body')
-    @if (!Utils::isWhiteLabel())
+    {{ // *** Modificacion de FACTURACION: }}
+    {{ //@if (!Utils::isWhiteLabel()) }}
+    @if (Utils::isWhiteLabel())
+    {{ // *** Fin de Modificacion de FACTURACION:}}
         <div class="container-fluid">
             <div class="row header">
                 <div class="col-md-6 col-xs-12 text-center">
