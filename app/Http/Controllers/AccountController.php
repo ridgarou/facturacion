@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\SubdomainWasUpdated;
 use App\Events\UserSettingsChanged;
 use App\Events\UserSignedUp;
 use App\Http\Requests\SaveClientPortalSettings;
@@ -493,6 +494,8 @@ class AccountController extends BaseController
             'account' => Auth::user()->account,
             'title' => trans('texts.tax_rates'),
             'taxRates' => TaxRate::scope()->whereIsInclusive(false)->get(),
+            'countInvoices' => Invoice::scope()->withTrashed()->count(),
+            'hasInclusiveTaxRates' => TaxRate::scope()->whereIsInclusive(true)->count() ? true : false,
         ];
 
         return View::make('accounts.tax_rates', $data);
@@ -769,6 +772,20 @@ class AccountController extends BaseController
     public function saveClientPortalSettings(SaveClientPortalSettings $request)
     {
         $account = $request->user()->account;
+
+        // check subdomain is unique in the lookup tables
+        if (request()->subdomain) {
+            if (! \App\Models\LookupAccount::validateField('subdomain', request()->subdomain, $account)) {
+                return Redirect::to('settings/' . ACCOUNT_CLIENT_PORTAL)
+                    ->withError(trans('texts.subdomain_taken'))
+                    ->withInput();
+            }
+        }
+
+        if ($account->subdomain !== $request->subdomain) {
+            event(new SubdomainWasUpdated($account));
+        }
+
         $account->fill($request->all());
         $account->client_view_css = $request->client_view_css;
 		$account->subdomain = $request->subdomain;
@@ -1123,6 +1140,11 @@ class AccountController extends BaseController
         }
 
         $rules = ['email' => 'email|required|unique:users,email,'.$user->id.',id'];
+
+        if ($user->google_2fa_secret) {
+            $rules['phone'] = 'required';
+        }
+
         $validator = Validator::make(Input::all(), $rules);
 
         if ($validator->fails()) {
@@ -1142,6 +1164,10 @@ class AccountController extends BaseController
                 $user->notify_viewed = Input::get('notify_viewed');
                 $user->notify_paid = Input::get('notify_paid');
                 $user->notify_approved = Input::get('notify_approved');
+            }
+
+            if ($user->google_2fa_secret && ! Input::get('enable_two_factor')) {
+                $user->google_2fa_secret = null;
             }
 
             if (Utils::isNinja()) {
@@ -1379,6 +1405,9 @@ class AccountController extends BaseController
         if (! $account->hasMultipleAccounts()) {
             $company = $account->company;
             $refunded = $company->processRefund(Auth::user());
+
+            $ninjaClient = $this->accountRepo->getNinjaClient($account);
+            $ninjaClient->delete();
         }
 
         Document::scope()->each(function ($item, $key) {

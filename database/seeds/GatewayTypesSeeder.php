@@ -18,6 +18,8 @@ class GatewayTypesSeeder extends Seeder
             ['alias' => 'alipay', 'name' => 'Alipay'],
             ['alias' => 'sofort', 'name' => 'Sofort'],
             ['alias' => 'sepa', 'name' => 'SEPA'],
+            ['alias' => 'gocardless', 'name' => 'GoCardless'],
+            ['alias' => 'apple_pay', 'name' => 'Apple Pay'],
         ];
 
         foreach ($gateway_types as $gateway_type) {

@@ -8,14 +8,11 @@
 </div>
 
 <div class="pull-left">
-	@can('create', 'invoice')
-		@if ($entityType == ENTITY_TASK)
+	@if (in_array($entityType, [ENTITY_TASK, ENTITY_EXPENSE, ENTITY_PRODUCT, ENTITY_PROJECT]))
+		@can('create', 'invoice')
 			{!! Button::primary(trans('texts.invoice'))->withAttributes(['class'=>'invoice', 'onclick' =>'submitForm_'.$entityType.'("invoice")'])->appendIcon(Icon::create('check')) !!}
-		@endif
-		@if ($entityType == ENTITY_EXPENSE)
-			{!! Button::primary(trans('texts.invoice'))->withAttributes(['class'=>'invoice', 'onclick' =>'submitForm_'.$entityType.'("invoice")'])->appendIcon(Icon::create('check')) !!}
-		@endif
-	@endcan
+		@endcan
+	@endif
 
 	{!! DropdownButton::normal(trans('texts.archive'))
 			->withContents($datatable->bulkActions())
@@ -49,7 +46,7 @@
 	<input id="tableFilter_{{ $entityType }}" type="text" style="width:180px;margin-right:17px;background-color: white !important"
         class="form-control pull-left" placeholder="{{ trans('texts.filter') }}" value="{{ Input::get('filter') }}"/>
 
-	@if ($entityType == ENTITY_INVOICE && auth()->user()->account->isModuleEnabled(ENTITY_RECURRING_INVOICE))
+	@if (false && $entityType == ENTITY_INVOICE && auth()->user()->account->isModuleEnabled(ENTITY_RECURRING_INVOICE))
 		{!! DropdownButton::normal(trans('texts.recurring'))
 			->withAttributes(['class'=>'recurringDropdown'])
 			->withContents([
@@ -58,8 +55,8 @@
 		  )->split() !!}
 		<script type="text/javascript">
 			$(function() {
-				$('.recurringDropdown:not(.dropdown-toggle)').click(function() {
-					window.location = '{{ url('/recurring_invoices') }}';
+				$('.recurringDropdown:not(.dropdown-toggle)').click(function(event) {
+					openUrlOnClick('{{ url('/recurring_invoices') }}', event);
 				});
 			});
 		</script>
@@ -78,29 +75,16 @@
 		  )->split() !!}
 	  	<script type="text/javascript">
 		  	$(function() {
-				$('.recurringDropdown:not(.dropdown-toggle)').click(function() {
-		  			window.location = '{{ url('/recurring_expenses') }}';
+				$('.recurringDropdown:not(.dropdown-toggle)').click(function(event) {
+					openUrlOnClick('{{ url('/recurring_expenses') }}', event)
 		  		});
-				$('.categoriesDropdown:not(.dropdown-toggle)').click(function() {
-		  			window.location = '{{ url('/expense_categories') }}';
+				$('.categoriesDropdown:not(.dropdown-toggle)').click(function(event) {
+					openUrlOnClick('{{ url('/expense_categories') }}', event);
 		  		});
 			});
 		</script>
 	@elseif ($entityType == ENTITY_TASK)
 		{!! Button::normal(trans('texts.time_tracker'))->asLinkTo('javascript:openTimeTracker()')->appendIcon(Icon::create('time')) !!}
-		{!! DropdownButton::normal(trans('texts.projects'))
-			->withAttributes(['class'=>'projectsDropdown'])
-			->withContents([
-			  ['label' => trans('texts.new_project'), 'url' => url('/projects/create')],
-			]
-		  )->split() !!}
-	  	<script type="text/javascript">
-		  	$(function() {
-		  		$('.projectsDropdown:not(.dropdown-toggle)').click(function() {
-		  			window.location = '{{ url('projects') }}';
-		  		});
-			});
-		</script>
     @endif
 
 	@if (Auth::user()->can('create', $entityType) && empty($vendorId))
@@ -144,7 +128,15 @@
 
 <script type="text/javascript">
 
+	var submittedForm;
 	function submitForm_{{ $entityType }}(action, id) {
+		// prevent duplicate form submissions
+		if (submittedForm) {
+			swal("{{ trans('texts.processing_request') }}")
+			return;
+		}
+		submittedForm = true;
+
 		if (id) {
 			$('#public_id_{{ $entityType }}').val(id);
 		}

@@ -161,6 +161,12 @@ class EntityModel extends Eloquent
 
         $query->where($this->getTable() .'.account_id', '=', $accountId);
 
+        // If 'false' is passed as the publicId return nothing rather than everything
+        if (func_num_args() > 1 && ! $publicId && ! $accountId) {
+            $query->where('id', '=', 0);
+            return $query;
+        }
+
         if ($publicId) {
             if (is_array($publicId)) {
                 $query->whereIn('public_id', $publicId);
@@ -321,6 +327,7 @@ class EntityModel extends Eloquent
             'settings' => 'cog',
             'self-update' => 'download',
             'reports' => 'th-list',
+            'projects' => 'briefcase',
         ];
 
         return array_get($icons, $entityType);

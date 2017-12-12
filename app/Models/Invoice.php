@@ -216,6 +216,7 @@ class Invoice extends EntityModel implements BalanceAffecting
                 'public_notes',
                 'invoice_footer',
                 'partial',
+                'partial_due_date',
             ] as $field) {
                 if ($this->$field != $this->getOriginal($field)) {
                     return true;
@@ -460,6 +461,38 @@ class Invoice extends EntityModel implements BalanceAffecting
     }
 
     /**
+     * @param $query
+     * @param $typeId
+     *
+     * @return mixed
+     */
+    public function scopeStatusIds($query, $statusIds)
+    {
+        if (! $statusIds || (is_array($statusIds) && ! count($statusIds))) {
+            return $query;
+        }
+
+        return $query->where(function ($query) use ($statusIds) {
+            foreach ($statusIds as $statusId) {
+                $query->orWhere('invoice_status_id', '=', $statusId);
+            }
+            if (in_array(INVOICE_STATUS_UNPAID, $statusIds)) {
+                $query->orWhere(function ($query) {
+                    $query->where('balance', '>', 0)
+                          ->where('is_public', '=', true);
+                });
+            }
+            if (in_array(INVOICE_STATUS_OVERDUE, $statusIds)) {
+                $query->orWhere(function ($query) {
+                    $query->where('balance', '>', 0)
+                          ->where('due_date', '<', date('Y-m-d'))
+                          ->where('is_public', '=', true);
+                });
+            }
+        });
+    }
+
+    /**
      * @param $typeId
      *
      * @return bool
@@ -634,6 +667,15 @@ class Invoice extends EntityModel implements BalanceAffecting
 
         if ($this->partial > 0) {
             $this->partial = $partial;
+
+            // clear the partial due date and set the due date
+            // using payment terms if it's blank
+            if (! $this->partial && $this->partial_due_date) {
+                $this->partial_due_date = null;
+                if (! $this->due_date) {
+                    $this->due_date = $this->account->defaultDueDate($this->client);
+                }
+            }
         }
 
         $this->save();
@@ -682,7 +724,7 @@ class Invoice extends EntityModel implements BalanceAffecting
         if ($quoteInvoiceId) {
             $label = 'converted';
         } elseif ($class == 'danger') {
-            $label = $entityType == ENTITY_INVOICE ? 'overdue' : 'expired';
+            $label = $entityType == ENTITY_INVOICE ? 'past_due' : 'expired';
         } else {
             $label = 'status_' . strtolower($status);
         }
@@ -719,7 +761,8 @@ class Invoice extends EntityModel implements BalanceAffecting
 
     public function statusClass()
     {
-        return static::calcStatusClass($this->invoice_status_id, $this->balance, $this->getOriginal('due_date'), $this->is_recurring);
+        $dueDate = $this->getOriginal('partial_due_date') ?: $this->getOriginal('due_date');
+        return static::calcStatusClass($this->invoice_status_id, $this->balance, $dueDate, $this->is_recurring);
     }
 
     public function statusLabel()
@@ -808,7 +851,7 @@ class Invoice extends EntityModel implements BalanceAffecting
      */
     public function isOverdue()
     {
-        return static::calcIsOverdue($this->balance, $this->due_date);
+        return static::calcIsOverdue($this->balance, $this->partial_due_date ?: $this->due_date);
     }
 
     /**
@@ -878,6 +921,7 @@ class Invoice extends EntityModel implements BalanceAffecting
             'custom_taxes1',
             'custom_taxes2',
             'partial',
+            'partial_due_date',
             'has_tasks',
             'custom_text_value1',
             'custom_text_value2',
@@ -943,6 +987,7 @@ class Invoice extends EntityModel implements BalanceAffecting
             'include_item_taxes_inline',
             'invoice_fields',
             'show_currency_code',
+            'inclusive_taxes',
         ]);
 
         foreach ($this->invoice_items as $invoiceItem) {
@@ -1198,7 +1243,7 @@ class Invoice extends EntityModel implements BalanceAffecting
         }
 
         $invitation = $this->invitations[0];
-        $link = $invitation->getLink('view', true);
+        $link = $invitation->getLink('view', true, true);
         $pdfString = false;
         $phantomjsSecret = env('PHANTOMJS_SECRET');
         $phantomjsLink = $link . "?phantomjs=true&phantomjs_secret={$phantomjsSecret}";
@@ -1208,8 +1253,11 @@ class Invoice extends EntityModel implements BalanceAffecting
                 // we see occasional 408 errors
                 for ($i=1; $i<=5; $i++) {
                     $pdfString = CurlUtils::phantom('GET', $phantomjsLink);
-                    if ($pdfString) {
+                    $pdfString = strip_tags($pdfString);
+                    if (strpos($pdfString, 'data') === 0) {
                         break;
+                    } else {
+                        $pdfString = false;
                     }
                 }
             }
@@ -1217,9 +1265,8 @@ class Invoice extends EntityModel implements BalanceAffecting
             if (! $pdfString && ($key = env('PHANTOMJS_CLOUD_KEY'))) {
                 $url = "http://api.phantomjscloud.com/api/browser/v2/{$key}/?request=%7Burl:%22{$link}?phantomjs=true%26phantomjs_secret={$phantomjsSecret}%22,renderType:%22html%22%7D";
                 $pdfString = CurlUtils::get($url);
+                $pdfString = strip_tags($pdfString);
             }
-
-            $pdfString = strip_tags($pdfString);
         } catch (\Exception $exception) {
             Utils::logError("PhantomJS - Failed to load {$phantomjsLink}: {$exception->getMessage()}");
             return false;
@@ -1234,7 +1281,7 @@ class Invoice extends EntityModel implements BalanceAffecting
             if ($pdf = Utils::decodePDF($pdfString)) {
                 return $pdf;
             } else {
-                Utils::logError("PhantomJS - Unable to decode {$phantomjsLink}: {$pdfString}");
+                Utils::logError("PhantomJS - Unable to decode {$phantomjsLink}");
                 return false;
             }
         } else {
@@ -1305,17 +1352,26 @@ class Invoice extends EntityModel implements BalanceAffecting
     public function getTaxes($calculatePaid = false)
     {
         $taxes = [];
+        $account = $this->account;
         $taxable = $this->getTaxable();
         $paidAmount = $this->getAmountPaid($calculatePaid);
 
         if ($this->tax_name1) {
-            $invoiceTaxAmount = round($taxable * ($this->tax_rate1 / 100), 2);
+            if ($account->inclusive_taxes) {
+                $invoiceTaxAmount = round(($taxable * 100) / (100 + ($this->tax_rate1 * 100)), 2);
+            } else {
+                $invoiceTaxAmount = round($taxable * ($this->tax_rate1 / 100), 2);
+            }
             $invoicePaidAmount = floatval($this->amount) && $invoiceTaxAmount ? ($paidAmount / $this->amount * $invoiceTaxAmount) : 0;
             $this->calculateTax($taxes, $this->tax_name1, $this->tax_rate1, $invoiceTaxAmount, $invoicePaidAmount);
         }
 
         if ($this->tax_name2) {
-            $invoiceTaxAmount = round($taxable * ($this->tax_rate2 / 100), 2);
+            if ($account->inclusive_taxes) {
+                $invoiceTaxAmount = round(($taxable * 100) / (100 + ($this->tax_rate2 * 100)), 2);
+            } else {
+                $invoiceTaxAmount = round($taxable * ($this->tax_rate2 / 100), 2);
+            }
             $invoicePaidAmount = floatval($this->amount) && $invoiceTaxAmount ? ($paidAmount / $this->amount * $invoiceTaxAmount) : 0;
             $this->calculateTax($taxes, $this->tax_name2, $this->tax_rate2, $invoiceTaxAmount, $invoicePaidAmount);
         }
@@ -1324,13 +1380,21 @@ class Invoice extends EntityModel implements BalanceAffecting
             $itemTaxable = $this->getItemTaxable($invoiceItem, $taxable);
 
             if ($invoiceItem->tax_name1) {
-                $itemTaxAmount = round($itemTaxable * ($invoiceItem->tax_rate1 / 100), 2);
+                if ($account->inclusive_taxes) {
+                    $itemTaxAmount = round(($itemTaxable * 100) / (100 + ($invoiceItem->tax_rate1 * 100)), 2);
+                } else {
+                    $itemTaxAmount = round($itemTaxable * ($invoiceItem->tax_rate1 / 100), 2);
+                }
                 $itemPaidAmount = floatval($this->amount) && $itemTaxAmount ? ($paidAmount / $this->amount * $itemTaxAmount) : 0;
                 $this->calculateTax($taxes, $invoiceItem->tax_name1, $invoiceItem->tax_rate1, $itemTaxAmount, $itemPaidAmount);
             }
 
             if ($invoiceItem->tax_name2) {
-                $itemTaxAmount = round($itemTaxable * ($invoiceItem->tax_rate2 / 100), 2);
+                if ($account->inclusive_taxes) {
+                    $itemTaxAmount = round(($itemTaxable * 100) / (100 + ($invoiceItem->tax_rate2 * 100)), 2);
+                } else {
+                    $itemTaxAmount = round($itemTaxable * ($invoiceItem->tax_rate2 / 100), 2);
+                }
                 $itemPaidAmount = floatval($this->amount) && $itemTaxAmount ? ($paidAmount / $this->amount * $itemTaxAmount) : 0;
                 $this->calculateTax($taxes, $invoiceItem->tax_name2, $invoiceItem->tax_rate2, $itemTaxAmount, $itemPaidAmount);
             }
@@ -1465,7 +1529,7 @@ class Invoice extends EntityModel implements BalanceAffecting
 
         if ($entityType == ENTITY_INVOICE) {
             $statuses[INVOICE_STATUS_UNPAID] = trans('texts.unpaid');
-            $statuses[INVOICE_STATUS_OVERDUE] = trans('texts.overdue');
+            $statuses[INVOICE_STATUS_OVERDUE] = trans('texts.past_due');
         }
 
         return $statuses;

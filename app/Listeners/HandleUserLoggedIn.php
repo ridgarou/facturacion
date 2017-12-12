@@ -41,7 +41,8 @@ class HandleUserLoggedIn
      */
     public function handle(UserLoggedIn $event)
     {
-        $account = Auth::user()->account;
+        $user = auth()->user();
+        $account = $user->account;
 
         if (! Utils::isNinja() && empty($account->last_login)) {
             event(new UserSignedUp());
@@ -49,6 +50,11 @@ class HandleUserLoggedIn
 
         $account->last_login = Carbon::now()->toDateTimeString();
         $account->save();
+
+        if ($user->failed_logins > 0) {
+            $user->failed_logins = 0;
+            $user->save();
+        }
 
         $users = $this->accountRepo->loadAccounts(Auth::user()->id);
         Session::put(SESSION_USER_ACCOUNTS, $users);
@@ -95,6 +101,8 @@ class HandleUserLoggedIn
             // warn if using the default app key
             if (in_array(config('app.key'), ['SomeRandomString', 'SomeRandomStringSomeRandomString', 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'])) {
                 Session::flash('error', trans('texts.error_app_key_set_to_default'));
+            } elseif (in_array($appCipher, ['MCRYPT_RIJNDAEL_256', 'MCRYPT_RIJNDAEL_128'])) {
+                Session::flash('error', trans('texts.mcrypt_warning'));
             }
         }
     }

@@ -74,9 +74,10 @@ class InvoiceRepository extends BaseRepository
                 'invoices.balance',
                 'invoices.invoice_date',
                 'invoices.due_date as due_date_sql',
+                'invoices.partial_due_date',
                 DB::raw("CONCAT(invoices.invoice_date, invoices.created_at) as date"),
-                DB::raw("CONCAT(invoices.due_date, invoices.created_at) as due_date"),
-                DB::raw("CONCAT(invoices.due_date, invoices.created_at) as valid_until"),
+                DB::raw("CONCAT(COALESCE(invoices.partial_due_date, invoices.due_date), invoices.created_at) as due_date"),
+                DB::raw("CONCAT(COALESCE(invoices.partial_due_date, invoices.due_date), invoices.created_at) as valid_until"),
                 'invoice_statuses.name as status',
                 'invoice_statuses.name as invoice_status_name',
                 'contacts.first_name',
@@ -338,7 +339,7 @@ class InvoiceRepository extends BaseRepository
             } elseif (Invoice::calcIsOverdue($model->balance, $model->due_date)) {
                 $class = 'danger';
                 if ($entityType == ENTITY_INVOICE) {
-                    $label = trans('texts.overdue');
+                    $label = trans('texts.past_due');
                 } else {
                     $label = trans('texts.expired');
                 }
@@ -389,7 +390,7 @@ class InvoiceRepository extends BaseRepository
             $invoice->custom_taxes2 = $account->custom_invoice_taxes2 ?: false;
 
             // set the default due date
-            if ($entityType == ENTITY_INVOICE) {
+            if ($entityType == ENTITY_INVOICE && empty($data['partial_due_date'])) {
                 $client = Client::scope()->whereId($data['client_id'])->first();
                 $invoice->due_date = $account->defaultDueDate($client);
             }
@@ -401,6 +402,8 @@ class InvoiceRepository extends BaseRepository
         }
 
         if ($invoice->is_deleted) {
+            return $invoice;
+        } elseif ($invoice->isSent() && config('ninja.lock_sent_invoices')) {
             return $invoice;
         }
 
@@ -445,6 +448,7 @@ class InvoiceRepository extends BaseRepository
         if (isset($data['is_amount_discount'])) {
             $invoice->is_amount_discount = $data['is_amount_discount'] ? true : false;
         }
+
         if (isset($data['invoice_date_sql'])) {
             $invoice->invoice_date = $data['invoice_date_sql'];
         } elseif (isset($data['invoice_date'])) {
@@ -499,7 +503,14 @@ class InvoiceRepository extends BaseRepository
             $invoice->terms = '';
         }
 
-        $invoice->invoice_footer = (isset($data['invoice_footer']) && trim($data['invoice_footer'])) ? trim($data['invoice_footer']) : (! $publicId && $account->invoice_footer ? $account->invoice_footer : '');
+        if (isset($data['invoice_footer']) && trim($data['invoice_footer'])) {
+            $invoice->invoice_footer = trim($data['invoice_footer']);
+        } elseif ($isNew && ! $invoice->is_recurring && $account->invoice_footer) {
+            $invoice->invoice_footer = $account->invoice_footer;
+        } else {
+            $invoice->invoice_footer = '';
+        }
+
         $invoice->public_notes = isset($data['public_notes']) ? trim($data['public_notes']) : '';
 
         // process date variables if not recurring
@@ -596,10 +607,12 @@ class InvoiceRepository extends BaseRepository
             $total += $invoice->custom_value2;
         }
 
-        $taxAmount1 = round($total * ($invoice->tax_rate1 ? $invoice->tax_rate1 : 0) / 100, 2);
-        $taxAmount2 = round($total * ($invoice->tax_rate2 ? $invoice->tax_rate2 : 0) / 100, 2);
-        $total = round($total + $taxAmount1 + $taxAmount2, 2);
-        $total += $itemTax;
+        if (! $account->inclusive_taxes) {
+            $taxAmount1 = round($total * ($invoice->tax_rate1 ? $invoice->tax_rate1 : 0) / 100, 2);
+            $taxAmount2 = round($total * ($invoice->tax_rate2 ? $invoice->tax_rate2 : 0) / 100, 2);
+            $total = round($total + $taxAmount1 + $taxAmount2, 2);
+            $total += $itemTax;
+        }
 
         // custom fields not charged taxes
         if ($invoice->custom_value1 && ! $invoice->custom_taxes1) {
@@ -617,6 +630,14 @@ class InvoiceRepository extends BaseRepository
 
         if (isset($data['partial'])) {
             $invoice->partial = max(0, min(round(Utils::parseFloat($data['partial']), 2), $invoice->balance));
+        }
+
+        if ($invoice->partial) {
+            if (isset($data['partial_due_date'])) {
+                $invoice->partial_due_date = Utils::toSqlDate($data['partial_due_date']);
+            }
+        } else {
+            $invoice->partial_due_date = null;
         }
 
         $invoice->amount = $total;
@@ -842,6 +863,10 @@ class InvoiceRepository extends BaseRepository
                     ->whereInvoiceNumber($invoiceNumber)
                     ->first()) {
                 $invoiceNumber = false;
+            } else {
+                // since we aren't using the counter we need to offset it by one
+                $account->invoice_number_counter -= 1;
+                $account->save();
             }
         }
 
@@ -881,7 +906,7 @@ class InvoiceRepository extends BaseRepository
             if ($account->invoice_terms) {
                 $clone->terms = $account->invoice_terms;
             }
-            if ($account->auto_convert_quote) {
+            if (! auth()->check()) {
                 $clone->is_public = true;
                 $clone->invoice_status_id = INVOICE_STATUS_SENT;
             }
@@ -1137,8 +1162,11 @@ class InvoiceRepository extends BaseRepository
 
         for ($i = 1; $i <= 3; $i++) {
             if ($date = $account->getReminderDate($i, $filterEnabled)) {
-                $field = $account->{"field_reminder{$i}"} == REMINDER_FIELD_DUE_DATE ? 'due_date' : 'invoice_date';
-                $dates[] = "$field = '$date'";
+                if ($account->{"field_reminder{$i}"} == REMINDER_FIELD_DUE_DATE) {
+                    $dates[] = "(due_date = '$date' OR partial_due_date = '$date')";
+                } else {
+                    $dates[] = "invoice_date = '$date'";
+                }
             }
         }
 
@@ -1148,7 +1176,10 @@ class InvoiceRepository extends BaseRepository
 
         $sql = implode(' OR ', $dates);
         $invoices = Invoice::invoiceType(INVOICE_TYPE_STANDARD)
-                    ->with('invoice_items')
+                    ->with('client', 'invoice_items')
+                    ->whereHas('client', function ($query) {
+                        $query->whereSendReminders(true);
+                    })
                     ->whereAccountId($account->id)
                     ->where('balance', '>', 0)
                     ->where('is_recurring', '=', false)

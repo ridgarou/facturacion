@@ -460,7 +460,7 @@ if (window.ko) {
 function comboboxHighlighter(item) {
     var query = this.query.replace(/[\-\[\]{}()*+?.,\\\^$|#\s]/g, '\\$&');
     var result = item.replace(new RegExp('<br/>', 'g'), "\n");
-    result = stripHtmlTags(result);
+    result = _.escape(result);
     result = result.replace(new RegExp('(' + query + ')', 'ig'), function ($1, match) {
         return match ? '<strong>' + match + '</strong>' : query;
     });
@@ -474,17 +474,6 @@ function inIframe () {
     } catch (e) {
         return true;
     }
-}
-
-function comboboxMatcher(item) {
-    return ~stripHtmlTags(item).toLowerCase().indexOf(this.query.toLowerCase());
-}
-
-function stripHtmlTags(text) {
-    // http://stackoverflow.com/a/5002618/497368
-    var div = document.createElement("div");
-    div.innerHTML = text;
-    return div.textContent || div.innerText || '';
 }
 
 function getContactDisplayName(contact)
@@ -524,101 +513,6 @@ function getClientDisplayName(client)
     return getContactDisplayName(contact);
   }
   return '';
-}
-
-function populateInvoiceComboboxes(clientId, invoiceId) {
-  var clientMap = {};
-  var invoiceMap = {};
-  var invoicesForClientMap = {};
-  var $clientSelect = $('select#client');
-
-  for (var i=0; i<invoices.length; i++) {
-    var invoice = invoices[i];
-    var client = invoice.client;
-
-    if (!invoicesForClientMap.hasOwnProperty(client.public_id)) {
-      invoicesForClientMap[client.public_id] = [];
-    }
-
-    invoicesForClientMap[client.public_id].push(invoice);
-    invoiceMap[invoice.public_id] = invoice;
-  }
-
-  for (var i=0; i<clients.length; i++) {
-    var client = clients[i];
-    clientMap[client.public_id] = client;
-  }
-
-  $clientSelect.append(new Option('', ''));
-  for (var i=0; i<clients.length; i++) {
-    var client = clients[i];
-    var clientName = getClientDisplayName(client);
-    if (!clientName) {
-        continue;
-    }
-    $clientSelect.append(new Option(clientName, client.public_id));
-  }
-
-  if (clientId) {
-    $clientSelect.val(clientId);
-  }
-
-  $clientSelect.combobox();
-  $clientSelect.on('change', function(e) {
-    var clientId = $('input[name=client]').val();
-    var invoiceId = $('input[name=invoice]').val();
-    var invoice = invoiceMap[invoiceId];
-    if (invoice && invoice.client.public_id == clientId) {
-      e.preventDefault();
-      return;
-    }
-    setComboboxValue($('.invoice-select'), '', '');
-    $invoiceCombobox = $('select#invoice');
-    $invoiceCombobox.find('option').remove().end().combobox('refresh');
-    $invoiceCombobox.append(new Option('', ''));
-    var list = clientId ? (invoicesForClientMap.hasOwnProperty(clientId) ? invoicesForClientMap[clientId] : []) : invoices;
-    for (var i=0; i<list.length; i++) {
-      var invoice = list[i];
-      var client = clientMap[invoice.client.public_id];
-      if (!client || !getClientDisplayName(client)) continue; // client is deleted/archived
-      $invoiceCombobox.append(new Option(invoice.invoice_number + ' - ' + invoice.invoice_status.name + ' - ' +
-                getClientDisplayName(client) + ' - ' + formatMoneyInvoice(invoice.amount, invoice) + ' | ' +
-                formatMoneyInvoice(invoice.balance, invoice),  invoice.public_id));
-    }
-    $('select#invoice').combobox('refresh');
-  });
-
-  var $invoiceSelect = $('select#invoice').on('change', function(e) {
-    $clientCombobox = $('select#client');
-    var invoiceId = $('input[name=invoice]').val();
-    if (invoiceId) {
-      var invoice = invoiceMap[invoiceId];
-      var client = clientMap[invoice.client.public_id];
-      invoice.client = client;
-      setComboboxValue($('.client-select'), client.public_id, getClientDisplayName(client));
-      if (!parseFloat($('#amount').val())) {
-        $('#amount').val(parseFloat(invoice.balance).toFixed(2));
-      }
-    }
-  });
-
-  $invoiceSelect.combobox();
-
-  if (invoiceId) {
-    var invoice = invoiceMap[invoiceId];
-    var client = clientMap[invoice.client.public_id];
-    invoice.client = client;
-    setComboboxValue($('.invoice-select'), invoice.public_id, (invoice.invoice_number + ' - ' +
-            invoice.invoice_status.name + ' - ' + getClientDisplayName(client) + ' - ' +
-            formatMoneyInvoice(invoice.amount, invoice) + ' | ' + formatMoneyInvoice(invoice.balance, invoice)));
-    $invoiceSelect.trigger('change');
-  } else if (clientId) {
-    var client = clientMap[clientId];
-    setComboboxValue($('.client-select'), client.public_id, getClientDisplayName(client));
-    $clientSelect.trigger('change');
-  } else {
-    $clientSelect.trigger('change');
-  }
 }
 
 
@@ -672,14 +566,8 @@ function calculateAmounts(invoice) {
   var total = 0;
   var hasTaxes = false;
   var taxes = {};
-  invoice.has_product_key = false;
   invoice.has_custom_item_value1 = false;
   invoice.has_custom_item_value2 = false;
-
-  // Bold designs currently breaks w/o the product column
-  if (invoice.invoice_design_id == 2) {
-      invoice.has_product_key = true;
-  }
 
   var hasStandard = false;
   var hasTask = false;
@@ -687,12 +575,12 @@ function calculateAmounts(invoice) {
   // sum line item
   for (var i=0; i<invoice.invoice_items.length; i++) {
     var item = invoice.invoice_items[i];
-    var lineTotal = invoice.is_statement ? roundToTwo(NINJA.parseFloat(item.balance)) : roundSignificant(NINJA.parseFloat(item.cost)) * roundSignificant(NINJA.parseFloat(item.qty));
+    var lineTotal = invoice.is_statement ? roundToTwo(NINJA.parseFloat(item.balance)) : roundSignificant(NINJA.parseFloat(item.cost) * NINJA.parseFloat(item.qty));
     lineTotal = roundToTwo(lineTotal);
     if (lineTotal) {
       total += lineTotal;
     }
-    if (!item.notes && !item.product_key) {
+    if (!item.notes && !item.product_key && !item.cost) {
         continue;
     }
     if (item.invoice_item_type_id == 2) {
@@ -712,12 +600,6 @@ function calculateAmounts(invoice) {
     var taxName1 = '';
     var taxRate2 = 0;
     var taxName2 = '';
-
-    if (item.product_key) {
-        invoice.has_product_key = true;
-    } else if (invoice.invoice_items.length == 1 && !item.qty) {
-        invoice.has_product_key = true;
-    }
 
     if (invoice.features.invoice_settings) {
         if (item.custom_value1) {
@@ -740,7 +622,7 @@ function calculateAmounts(invoice) {
     }
 
     // calculate line item tax
-    var lineTotal = roundToFour(NINJA.parseFloat(item.cost)) * roundToFour(NINJA.parseFloat(item.qty));
+    var lineTotal = roundSignificant(NINJA.parseFloat(item.cost) * NINJA.parseFloat(item.qty));
     if (invoice.discount != 0) {
         if (parseInt(invoice.is_amount_discount)) {
             lineTotal -= roundToTwo((lineTotal/total) * invoice.discount);
@@ -749,8 +631,13 @@ function calculateAmounts(invoice) {
         }
     }
 
-    var taxAmount1 = roundToTwo(lineTotal * taxRate1 / 100);
+    if (invoice.account.inclusive_taxes != '1') {
+        var taxAmount1 = roundToTwo(lineTotal * taxRate1 / 100);
+    } else {
+        var taxAmount1 = roundToTwo((lineTotal * 100) / (100 + (taxRate1 * 100)));
+    }
     if (taxAmount1 != 0 || taxName1) {
+      hasTaxes = true;
       var key = taxName1 + taxRate1;
       if (taxes.hasOwnProperty(key)) {
         taxes[key].amount += taxAmount1;
@@ -759,8 +646,13 @@ function calculateAmounts(invoice) {
       }
     }
 
-    var taxAmount2 = roundToTwo(lineTotal * taxRate2 / 100);
+    if (invoice.account.inclusive_taxes != '1') {
+        var taxAmount2 = roundToTwo(lineTotal * taxRate2 / 100);
+    } else {
+        var taxAmount2 = roundToTwo((lineTotal * 100) / (100 + (taxRate2 * 100)));
+    }
     if (taxAmount2 != 0 || taxName2) {
+      hasTaxes = true;
       var key = taxName2 + taxRate2;
       if (taxes.hasOwnProperty(key)) {
         taxes[key].amount += taxAmount2;
@@ -768,11 +660,9 @@ function calculateAmounts(invoice) {
         taxes[key] = {name: taxName2, rate:taxRate2, amount:taxAmount2};
       }
     }
-
-    if (item.tax_name1 || item.tax_name2) {
-      hasTaxes = true;
-    }
   }
+
+  invoice.has_item_taxes = hasTaxes;
   invoice.subtotal_amount = total;
 
   var discount = 0;
@@ -801,14 +691,20 @@ function calculateAmounts(invoice) {
   if (parseFloat(invoice.tax_rate2 || 0) != 0) {
     taxRate2 = parseFloat(invoice.tax_rate2);
   }
-  taxAmount1 = roundToTwo(total * taxRate1 / 100);
-  taxAmount2 = roundToTwo(total * taxRate2 / 100);
-  total = total + taxAmount1 + taxAmount2;
 
-  for (var key in taxes) {
-    if (taxes.hasOwnProperty(key)) {
-        total += taxes[key].amount;
-    }
+  if (invoice.account.inclusive_taxes != '1') {
+      taxAmount1 = roundToTwo(total * taxRate1 / 100);
+      taxAmount2 = roundToTwo(total * taxRate2 / 100);
+      total = total + taxAmount1 + taxAmount2;
+
+      for (var key in taxes) {
+        if (taxes.hasOwnProperty(key)) {
+            total += taxes[key].amount;
+        }
+      }
+  } else {
+     taxAmount1 = roundToTwo((total * 100) / (100 + (taxRate1 * 100)));
+     taxAmount2 = roundToTwo((total * 100) / (100 + (taxRate2 * 100)));
   }
 
   // custom fields w/o with taxes
@@ -1083,20 +979,20 @@ function getPrecision(number) {
   }
 }
 
-function roundSignificant(number) {
+function roundSignificant(number, toString) {
   var precision = getPrecision(number);
-  var value = roundToPrecision(number, precision);
-  return isNaN(value) ? 0 : value;
+  var val = roundToPrecision(number, precision) || 0;
+  return toString ? val.toFixed(precision) : val;
 }
 
 function roundToTwo(number, toString) {
-  var val = roundToPrecision(number, 2);
-  return toString ? val.toFixed(2) : (val || 0);
+  var val = roundToPrecision(number, 2) || 0;
+  return toString ? val.toFixed(2) : val;
 }
 
 function roundToFour(number, toString) {
-  var val = roundToPrecision(number, 4);
-  return toString ? val.toFixed(4) : (val || 0);
+  var val = roundToPrecision(number, 4) || 0;
+  return toString ? val.toFixed(4) : val;
 }
 
 // https://stackoverflow.com/a/18358056/497368
@@ -1288,4 +1184,44 @@ function brewerColor(number) {
     var number = (number-1) % colors.length;
 
     return colors[number];
+}
+
+// https://gist.github.com/sente/1083506
+function formatXml(xml) {
+    var formatted = '';
+    var reg = /(>)(<)(\/*)/g;
+    xml = xml.replace(reg, '$1\r\n$2$3');
+    var pad = 0;
+    jQuery.each(xml.split('\r\n'), function(index, node) {
+        var indent = 0;
+        if (node.match( /.+<\/\w[^>]*>$/ )) {
+            indent = 0;
+        } else if (node.match( /^<\/\w/ )) {
+            if (pad != 0) {
+                pad -= 1;
+            }
+        } else if (node.match( /^<\w[^>]*[^\/]>.*$/ )) {
+            indent = 1;
+        } else {
+            indent = 0;
+        }
+
+        var padding = '';
+        for (var i = 0; i < pad; i++) {
+            padding += '  ';
+        }
+
+        formatted += padding + node + '\r\n';
+        pad += indent;
+    });
+
+    return formatted;
+}
+
+function openUrlOnClick(url, event) {
+    if (event.ctrlKey) {
+        window.open(url, '_blank');
+    } else {
+        window.location = url;
+    }
 }

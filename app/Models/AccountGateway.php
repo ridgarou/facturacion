@@ -136,12 +136,29 @@ class AccountGateway extends EntityModel
         return $this->getConfigField('publishableKey');
     }
 
+    public function getAppleMerchantId()
+    {
+        if (! $this->isGateway(GATEWAY_STRIPE)) {
+            return false;
+        }
+
+        return $this->getConfigField('appleMerchantId');
+    }
+
     /**
      * @return bool
      */
     public function getAchEnabled()
     {
         return ! empty($this->getConfigField('enableAch'));
+    }
+
+    /**
+     * @return bool
+     */
+    public function getApplePayEnabled()
+    {
+        return ! empty($this->getConfigField('enableApplePay'));
     }
 
     /**
@@ -158,6 +175,22 @@ class AccountGateway extends EntityModel
     public function getSofortEnabled()
     {
         return ! empty($this->getConfigField('enableSofort'));
+    }
+
+    /**
+     * @return bool
+     */
+    public function getSepaEnabled()
+    {
+        return ! empty($this->getConfigField('enableSepa'));
+    }
+
+    /**
+     * @return bool
+     */
+    public function getBitcoinEnabled()
+    {
+        return ! empty($this->getConfigField('enableBitcoin'));
     }
 
     /**

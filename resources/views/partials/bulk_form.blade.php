@@ -1,7 +1,7 @@
 <div style="display:none">
-    {!! Former::open($entityType . 's/bulk')->addClass('bulk-form') !!}
-    {!! Former::text('bulk_action') !!}
-    {!! Former::text('bulk_public_id') !!}
+    {!! Former::open($entityType . 's/bulk')->addClass("bulk-form bulk-{$entityType}-form") !!}
+    {!! Former::text('bulk_action')->addClass('bulk-action') !!}
+    {!! Former::text('bulk_public_id')->addClass('bulk-public-id') !!}
     {!! Former::close() !!}
 </div>
 
@@ -13,9 +13,16 @@
             }
         }
 
-        $('#bulk_public_id').val(id);
-        $('#bulk_action').val(action);
+        @if (in_array($entityType, [ENTITY_ACCOUNT_GATEWAY]))
+            if (action == 'archive') {
+                if (!confirm('{!! trans("texts.are_you_sure") !!}')) {
+                    return;
+                }
+            }
+        @endif
 
-        $('form.bulk-form').submit();
+        $('.bulk-public-id').val(id);
+        $('.bulk-action').val(action);
+        $('form.bulk-{{ $entityType }}-form').submit();
     }
 </script>

@@ -38,6 +38,12 @@ class ProjectDatatable extends EntityDatatable
                     }
                 },
             ],
+            [
+                'task_rate',
+                function ($model) {
+                    return floatval($model->task_rate) ? Utils::roundSignificant($model->task_rate) : '';
+                }
+            ],
         ];
     }
 
@@ -51,6 +57,15 @@ class ProjectDatatable extends EntityDatatable
                 },
                 function ($model) {
                     return Auth::user()->can('editByOwner', [ENTITY_PROJECT, $model->user_id]);
+                },
+            ],
+            [
+                trans('texts.invoice_project'),
+                function ($model) {
+                    return "javascript:submitForm_project('invoice', {$model->public_id})";
+                },
+                function ($model) {
+                    return Auth::user()->can('create', ENTITY_INVOICE);
                 },
             ],
         ];

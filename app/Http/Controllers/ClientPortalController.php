@@ -14,6 +14,7 @@ use App\Ninja\Repositories\CreditRepository;
 use App\Ninja\Repositories\DocumentRepository;
 use App\Ninja\Repositories\InvoiceRepository;
 use App\Ninja\Repositories\PaymentRepository;
+use App\Ninja\Repositories\TaskRepository;
 use App\Services\PaymentService;
 use Auth;
 use Barracuda\ArchiveStream\ZipArchive;
@@ -36,7 +37,14 @@ class ClientPortalController extends BaseController
     private $paymentRepo;
     private $documentRepo;
 
-    public function __construct(InvoiceRepository $invoiceRepo, PaymentRepository $paymentRepo, ActivityRepository $activityRepo, DocumentRepository $documentRepo, PaymentService $paymentService, CreditRepository $creditRepo)
+    public function __construct(
+        InvoiceRepository $invoiceRepo,
+        PaymentRepository $paymentRepo,
+        ActivityRepository $activityRepo,
+        DocumentRepository $documentRepo,
+        PaymentService $paymentService,
+        CreditRepository $creditRepo,
+        TaskRepository $taskRepo)
     {
         $this->invoiceRepo = $invoiceRepo;
         $this->paymentRepo = $paymentRepo;
@@ -44,6 +52,7 @@ class ClientPortalController extends BaseController
         $this->documentRepo = $documentRepo;
         $this->paymentService = $paymentService;
         $this->creditRepo = $creditRepo;
+        $this->taskRepo = $taskRepo;
     }
 
     public function view($invitationKey)
@@ -83,6 +92,7 @@ class ClientPortalController extends BaseController
 
         $invoice->invoice_date = Utils::fromSqlDate($invoice->invoice_date);
         $invoice->due_date = Utils::fromSqlDate($invoice->due_date);
+        $invoice->partial_due_date = Utils::fromSqlDate($invoice->partial_due_date);
         $invoice->features = [
             'customize_invoice_design' => $account->hasFeature(FEATURE_CUSTOMIZE_INVOICE_DESIGN),
             'remove_created_by' => $account->hasFeature(FEATURE_REMOVE_CREATED_BY),
@@ -132,9 +142,6 @@ class ClientPortalController extends BaseController
         }
 
         $showApprove = $invoice->quote_invoice_id ? false : true;
-        if ($invoice->due_date) {
-            $showApprove = time() < strtotime($invoice->getOriginal('due_date'));
-        }
         if ($invoice->invoice_status_id >= INVOICE_STATUS_APPROVED) {
             $showApprove = false;
         }
@@ -346,6 +353,7 @@ class ClientPortalController extends BaseController
             'title' => trans('texts.recurring_invoices'),
             'entityType' => ENTITY_RECURRING_INVOICE,
             'columns' => Utils::trans($columns),
+            'sortColumn' => 1,
         ];
 
         return response()->view('public_list', $data);
@@ -373,6 +381,7 @@ class ClientPortalController extends BaseController
             'title' => trans('texts.invoices'),
             'entityType' => ENTITY_INVOICE,
             'columns' => Utils::trans(['invoice_number', 'invoice_date', 'invoice_total', 'balance_due', 'due_date', 'status']),
+            'sortColumn' => 1,
         ];
 
         return response()->view('public_list', $data);
@@ -417,6 +426,7 @@ class ClientPortalController extends BaseController
             'entityType' => ENTITY_PAYMENT,
             'title' => trans('texts.payments'),
             'columns' => Utils::trans(['invoice', 'transaction_reference', 'method', 'payment_amount', 'payment_date', 'status']),
+            'sortColumn' => 4,
         ];
 
         return response()->view('public_list', $data);
@@ -501,6 +511,7 @@ class ClientPortalController extends BaseController
           'title' => trans('texts.quotes'),
           'entityType' => ENTITY_QUOTE,
           'columns' => Utils::trans(['quote_number', 'quote_date', 'quote_total', 'due_date', 'status']),
+          'sortColumn' => 1,
         ];
 
         return response()->view('public_list', $data);
@@ -536,6 +547,7 @@ class ClientPortalController extends BaseController
           'title' => trans('texts.credits'),
           'entityType' => ENTITY_CREDIT,
           'columns' => Utils::trans(['credit_date', 'credit_amount', 'credit_balance', 'notes']),
+          'sortColumn' => 0,
         ];
 
         return response()->view('public_list', $data);
@@ -548,6 +560,46 @@ class ClientPortalController extends BaseController
         }
 
         return $this->creditRepo->getClientDatatable($contact->client_id);
+    }
+
+    public function taskIndex()
+    {
+        if (! $contact = $this->getContact()) {
+            return $this->returnError();
+        }
+
+        $account = $contact->account;
+        $account->loadLocalizationSettings($contact->client);
+
+        if (! $contact->client->show_tasks_in_portal) {
+            return redirect()->to($account->enable_client_portal_dashboard ? '/client/dashboard' : '/client/payment_methods/');
+        }
+
+        if (! $account->enable_client_portal) {
+            return $this->returnError();
+        }
+
+        $color = $account->primary_color ? $account->primary_color : '#0b4d78';
+
+        $data = [
+          'color' => $color,
+          'account' => $account,
+          'title' => trans('texts.tasks'),
+          'entityType' => ENTITY_TASK,
+          'columns' => Utils::trans(['project', 'date', 'duration', 'description']),
+          'sortColumn' => 1,
+        ];
+
+        return response()->view('public_list', $data);
+    }
+
+    public function taskDatatable()
+    {
+        if (! $contact = $this->getContact()) {
+            return false;
+        }
+
+        return $this->taskRepo->getClientDatatable($contact->client_id);
     }
 
     public function documentIndex()
@@ -571,6 +623,7 @@ class ClientPortalController extends BaseController
           'title' => trans('texts.documents'),
           'entityType' => ENTITY_DOCUMENT,
           'columns' => Utils::trans(['invoice_number', 'name', 'document_date', 'document_size']),
+          'sortColumn' => 2,
         ];
 
         return response()->view('public_list', $data);
@@ -594,7 +647,7 @@ class ClientPortalController extends BaseController
         return response()->view('error', [
             'error' => $error ?: trans('texts.invoice_not_found'),
             'hideHeader' => true,
-            'account' => $this->getContact()->account,
+            'account' => $this->getContact() ? $this->getContact()->account : false,
         ]);
     }
 
