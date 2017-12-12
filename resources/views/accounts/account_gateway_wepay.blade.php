@@ -1,5 +1,19 @@
 @extends('header')
 
+@section('head')
+	@parent
+
+    <style type="text/css">
+        label.checkbox-inline {
+            padding-left: 0px;
+        }
+
+        label.checkbox-inline div {
+            padding-left: 20px;
+        }
+    </style>
+@stop
+
 @section('content')
     @parent
 
@@ -61,9 +75,10 @@
                     ->text(trans('texts.update_address_help'))
                     ->value(1) !!}
             {!! Former::checkboxes('creditCardTypes[]')
-                    ->label('Accepted Credit Cards')
+                    ->label('accepted_card_logos')
                     ->checkboxes($creditCardTypes)
                     ->class('creditcard-types')
+                    ->inline()
                     ->value(1) !!}
             {!! Former::checkbox('enable_ach')
                     ->label(trans('texts.ach'))

@@ -443,7 +443,9 @@ class ImportService
         // update the entity maps
         if ($entityType != ENTITY_CUSTOMER) {
             $mapFunction = 'add' . ucwords($entity->getEntityType()) . 'ToMaps';
-            $this->$mapFunction($entity);
+            if (method_exists($this, $mapFunction)) {
+                $this->$mapFunction($entity);
+            }
         }
 
         // if the invoice is paid we'll also create a payment record
@@ -647,7 +649,8 @@ class ImportService
     private function getCsvData($fileName)
     {
         $this->checkForFile($fileName);
-        $data = array_map('str_getcsv', file($fileName));
+        $file = file_get_contents($fileName);
+        $data = array_map("str_getcsv", preg_split('/\r*\n+|\r+/', $file));
 
         if (count($data) > 0) {
             $headers = $data[0];
@@ -809,7 +812,9 @@ class ImportService
                 continue;
             }
 
-            $obj->$field = $data[$index];
+            if (isset($data[$index])) {
+                $obj->$field = $data[$index];
+            }
         }
 
         return $obj;
@@ -926,6 +931,7 @@ class ImportService
     private function addInvoiceToMaps(Invoice $invoice)
     {
         if ($number = strtolower(trim($invoice->invoice_number))) {
+            $this->maps['invoices'][$number] = $invoice;
             $this->maps['invoice'][$number] = $invoice->id;
             $this->maps['invoice_client'][$number] = $invoice->client_id;
             $this->maps['invoice_ids'][$invoice->public_id] = $invoice->id;

@@ -27,8 +27,7 @@ function ViewModel(data) {
     self.setDueDate = function() {
         @if ($entityType == ENTITY_INVOICE)
             var paymentTerms = parseInt(self.invoice().client().payment_terms());
-            if (paymentTerms && paymentTerms != 0 && !self.invoice().due_date())
-            {
+            if (paymentTerms && paymentTerms != 0 && !self.invoice().due_date()) {
                 if (paymentTerms == -1) paymentTerms = 0;
                 var dueDate = $('#invoice_date').datepicker('getDate');
                 dueDate.setDate(dueDate.getDate() + paymentTerms);
@@ -52,7 +51,6 @@ function ViewModel(data) {
 
     self.invoice_taxes = ko.observable({{ Auth::user()->account->invoice_taxes ? 'true' : 'false' }});
     self.invoice_item_taxes = ko.observable({{ Auth::user()->account->invoice_item_taxes ? 'true' : 'false' }});
-    self.show_item_taxes = ko.observable({{ Auth::user()->account->show_item_taxes ? 'true' : 'false' }});
 
     self.mapping = {
         'invoice': {
@@ -257,6 +255,7 @@ function InvoiceModel(data) {
     self.partial = ko.observable(0);
     self.has_tasks = ko.observable();
     self.has_expenses = ko.observable();
+    self.partial_due_date = ko.observable('');
 
     self.custom_value1 = ko.observable(0);
     self.custom_value2 = ko.observable(0);
@@ -309,9 +308,6 @@ function InvoiceModel(data) {
             return false;
         }
         var itemModel = new ItemModel();
-        @if ($account->hide_quantity)
-            itemModel.qty(1);
-        @endif
         if (isTask) {
             itemModel.invoice_item_type_id({{ INVOICE_ITEM_TYPE_TASK }});
             self.invoice_items_with_tasks.push(itemModel);
@@ -429,10 +425,18 @@ function InvoiceModel(data) {
         }
 
         var taxRate1 = parseFloat(self.tax_rate1());
-        var tax1 = roundToTwo(total * (taxRate1/100));
+        @if ($account->inclusive_taxes)
+            var tax1 = roundToTwo((total * 100) / (100 + (taxRate1 * 100)));
+        @else
+            var tax1 = roundToTwo(total * (taxRate1/100));
+        @endif
 
         var taxRate2 = parseFloat(self.tax_rate2());
-        var tax2 = roundToTwo(total * (taxRate2/100));
+        @if ($account->inclusive_taxes)
+            var tax2 = roundToTwo((total * 100) / (100 + (taxRate2 * 100)));
+        @else
+            var tax2 = roundToTwo(total * (taxRate2/100));
+        @endif
 
         return self.formatMoney(tax1 + tax2);
     });
@@ -451,7 +455,11 @@ function InvoiceModel(data) {
                 }
             }
 
-            var taxAmount = roundToTwo(lineTotal * item.tax_rate1() / 100);
+            @if ($account->inclusive_taxes)
+                var taxAmount = roundToTwo((lineTotal * 100) / (100 + (item.tax_rate1() * 100)));
+            @else
+                var taxAmount = roundToTwo(lineTotal * item.tax_rate1() / 100);
+            @endif
             if (taxAmount) {
                 var key = item.tax_name1() + item.tax_rate1();
                 if (taxes.hasOwnProperty(key)) {
@@ -461,7 +469,11 @@ function InvoiceModel(data) {
                 }
             }
 
-            var taxAmount = roundToTwo(lineTotal * item.tax_rate2() / 100);
+            @if ($account->inclusive_taxes)
+                var taxAmount = roundToTwo((lineTotal * 100) / (100 + (item.tax_rate2() * 100)));
+            @else
+                var taxAmount = roundToTwo(lineTotal * item.tax_rate2() / 100);
+            @endif
             if (taxAmount) {
                 var key = item.tax_name2() + item.tax_rate2();
                 if (taxes.hasOwnProperty(key)) {
@@ -533,19 +545,21 @@ function InvoiceModel(data) {
             total = NINJA.parseFloat(total) + customValue2;
         }
 
-        var taxAmount1 = roundToTwo(total * parseFloat(self.tax_rate1()) / 100);
-        var taxAmount2 = roundToTwo(total * parseFloat(self.tax_rate2()) / 100);
+        @if (! $account->inclusive_taxes)
+            var taxAmount1 = roundToTwo(total * parseFloat(self.tax_rate1()) / 100);
+            var taxAmount2 = roundToTwo(total * parseFloat(self.tax_rate2()) / 100);
 
-        total = NINJA.parseFloat(total) + taxAmount1 + taxAmount2;
-        total = roundToTwo(total);
+            total = NINJA.parseFloat(total) + taxAmount1 + taxAmount2;
+            total = roundToTwo(total);
 
-        var taxes = self.totals.itemTaxes();
-        for (var key in taxes) {
-            if (taxes.hasOwnProperty(key)) {
-                total += taxes[key].amount;
-                total = roundToTwo(total);
+            var taxes = self.totals.itemTaxes();
+            for (var key in taxes) {
+                if (taxes.hasOwnProperty(key)) {
+                    total += taxes[key].amount;
+                    total = roundToTwo(total);
+                }
             }
-        }
+        @endif
 
         if (customValue1 && !customTaxes1) {
             total = NINJA.parseFloat(total) + customValue1;
@@ -620,6 +634,17 @@ function InvoiceModel(data) {
         var isAmountDiscount = $('#is_amount_discount').val();
         localStorage.setItem('last:is_amount_discount', isAmountDiscount);
     }
+
+    self.isPartialSet = ko.computed(function() {
+        return self.partial() && self.partial() <= model.invoice().totals.rawTotal()
+    });
+
+    self.showPartialDueDate = ko.computed(function() {
+        if (self.is_quote()) {
+            return false;
+        }
+        return self.isPartialSet();
+    });
 }
 
 function ClientModel(data) {
@@ -857,22 +882,20 @@ function ItemModel(data) {
         owner: this
     });
 
-    if (data) {
+    self.loadData = function(data) {
         ko.mapping.fromJS(data, {}, this);
-        var precision = getPrecision(this.cost());
-        var cost = parseFloat(this.cost());
-        if (cost) {
-            this.cost(cost.toFixed(Math.max(2, precision)));
-        }
+        this.cost(roundSignificant(this.cost(), true));
         this.qty(roundSignificant(this.qty()));
+    }
+
+    if (data) {
+        self.loadData(data);
     }
 
     this.totals = ko.observable();
 
     this.totals.rawTotal = ko.computed(function() {
-        var cost = roundSignificant(NINJA.parseFloat(self.cost()));
-        var qty = roundSignificant(NINJA.parseFloat(self.qty()));
-        var value = cost * qty;
+        var value = roundSignificant(NINJA.parseFloat(self.cost()) * NINJA.parseFloat(self.qty()));
         return value ? roundToTwo(value) : 0;
     });
 
@@ -890,7 +913,7 @@ function ItemModel(data) {
     }
 
     this.isEmpty = function() {
-        return !self.product_key() && !self.notes() && !self.cost() && (!self.qty() || {{ $account->hide_quantity ? 'true' : 'false' }});
+        return !self.product_key() && !self.notes() && !self.cost() && !self.qty();
     }
 
     this.onSelect = function() {}
@@ -997,10 +1020,10 @@ ko.bindingHandlers.productTypeahead = {
             limit: 50,
             templates: {
                 suggestion: function(item) { return '<div title="'
-                    + item.product_key + ': '
+                    + _.escape(item.product_key) + ': '
                     + item.cost + "\n"
                     + item.notes.substring(0, 60) + '">'
-                    + item.product_key + '</div>' }
+                    + _.escape(item.product_key) + '</div>' }
             },
             source: searchData(allBindings.items, allBindings.key)
         }).on('typeahead:select', function(element, datum, name) {
@@ -1012,10 +1035,12 @@ ko.bindingHandlers.productTypeahead = {
                 if (datum.notes && (!model.notes() || !model.task_public_id())) {
                     model.notes(datum.notes);
                 }
-                if (datum.cost) {
-                    model.cost(roundSignificant(datum.cost, 2));
+                if (parseFloat(datum.cost)) {
+                    if (! model.cost() || ! model.task_public_id()) {
+                        model.cost(roundSignificant(datum.cost, true));
+                    }
                 }
-                if (!model.qty()) {
+                if (!model.qty() && ! model.task_public_id()) {
                     model.qty(1);
                 }
                 @if ($account->invoice_item_taxes)

@@ -93,7 +93,7 @@ class InvoiceController extends BaseController
             ->where('invitations.invoice_id', '=', $invoice->id)
             ->where('invitations.account_id', '=', Auth::user()->account_id)
             ->where('invitations.deleted_at', '=', null)
-            ->select('contacts.public_id')->lists('public_id');
+            ->select('contacts.public_id')->pluck('public_id');
 
         $clients = Client::scope()->withTrashed()->with('contacts', 'country');
 
@@ -105,6 +105,7 @@ class InvoiceController extends BaseController
             $invoice->invoice_type_id = $clone;
             $invoice->invoice_number = $account->getNextNumber($invoice);
             $invoice->due_date = null;
+            $invoice->partial_due_date = null;
             $invoice->balance = $invoice->amount;
             $invoice->invoice_status_id = 0;
             $invoice->invoice_date = date_create()->format('Y-m-d');
@@ -123,6 +124,8 @@ class InvoiceController extends BaseController
         $invoice->start_date = Utils::fromSqlDate($invoice->start_date);
         $invoice->end_date = Utils::fromSqlDate($invoice->end_date);
         $invoice->last_sent_date = Utils::fromSqlDate($invoice->last_sent_date);
+        $invoice->partial_due_date = Utils::fromSqlDate($invoice->partial_due_date);
+
         $invoice->features = [
             'customize_invoice_design' => Auth::user()->hasFeature(FEATURE_CUSTOMIZE_INVOICE_DESIGN),
             'remove_created_by' => Auth::user()->hasFeature(FEATURE_REMOVE_CREATED_BY),
@@ -585,6 +588,28 @@ class InvoiceController extends BaseController
         ];
 
         return View::make('invoices.history', $data);
+    }
+
+    public function deliveryNote(InvoiceRequest $request)
+    {
+        $invoice = $request->entity();
+        $invoice->load('user', 'invoice_items', 'documents', 'expenses', 'expenses.documents', 'account.country', 'client.contacts', 'client.country', 'client.shipping_country');
+        $invoice->invoice_date = Utils::fromSqlDate($invoice->invoice_date);
+        $invoice->due_date = Utils::fromSqlDate($invoice->due_date);
+        $invoice->features = [
+            'customize_invoice_design' => Auth::user()->hasFeature(FEATURE_CUSTOMIZE_INVOICE_DESIGN),
+            'remove_created_by' => Auth::user()->hasFeature(FEATURE_REMOVE_CREATED_BY),
+            'invoice_settings' => Auth::user()->hasFeature(FEATURE_INVOICE_SETTINGS),
+        ];
+        $invoice->invoice_type_id = intval($invoice->invoice_type_id);
+
+        $data = [
+            'invoice' => $invoice,
+            'invoiceDesigns' => InvoiceDesign::getDesigns(),
+            'invoiceFonts' => Cache::get('fonts'),
+        ];
+
+        return View::make('invoices.delivery_note', $data);
     }
 
     public function checkInvoiceNumber($invoicePublicId = false)

@@ -136,6 +136,10 @@ trait GeneratesNumbers
      */
     public function hasClientNumberPattern($invoice)
     {
+        if (! $this->isPro()) {
+            return false;
+        }
+
         $pattern = $invoice->invoice_type_id == INVOICE_TYPE_QUOTE ? $this->quote_number_pattern : $this->invoice_number_pattern;
 
         return strstr($pattern, '$client') !== false || strstr($pattern, '$idNumber') !== false;
@@ -344,6 +348,9 @@ trait GeneratesNumbers
                 break;
             case FREQUENCY_THREE_MONTHS:
                 $resetDate->addMonths(3);
+                break;
+            case FREQUENCY_FOUR_MONTHS:
+                $resetDate->addMonths(4);
                 break;
             case FREQUENCY_SIX_MONTHS:
                 $resetDate->addMonths(6);

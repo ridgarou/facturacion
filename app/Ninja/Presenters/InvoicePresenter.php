@@ -67,11 +67,14 @@ class InvoicePresenter extends EntityPresenter
 
     public function age()
     {
-        if (! $this->entity->due_date || $this->entity->date_date == '0000-00-00') {
+        $invoice = $this->entity;
+        $dueDate = $invoice->partial_due_date ?: $invoice->due_date;
+
+        if (! $dueDate || $dueDate == '0000-00-00') {
             return 0;
         }
 
-        $date = Carbon::parse($this->entity->due_date);
+        $date = Carbon::parse($dueDate);
 
         if ($date->isFuture()) {
             return 0;
@@ -155,6 +158,11 @@ class InvoicePresenter extends EntityPresenter
         return Utils::fromSqlDate($this->entity->due_date);
     }
 
+    public function partial_due_date()
+    {
+        return Utils::fromSqlDate($this->entity->partial_due_date);
+    }
+
     public function frequency()
     {
         $frequency = $this->entity->frequency ? $this->entity->frequency->name : '';
@@ -234,6 +242,11 @@ class InvoicePresenter extends EntityPresenter
         }
 
         $actions[] = ['url' => url("{$entityType}s/{$entityType}_history/{$invoice->public_id}"), 'label' => trans('texts.view_history')];
+
+        if ($entityType == ENTITY_INVOICE) {
+            $actions[] = ['url' => url("invoices/delivery_note/{$invoice->public_id}"), 'label' => trans('texts.delivery_note')];
+        }
+
         $actions[] = DropdownButton::DIVIDER;
 
         if ($entityType == ENTITY_QUOTE) {
@@ -248,7 +261,7 @@ class InvoicePresenter extends EntityPresenter
             }
 
             if ($invoice->onlyHasTasks()) {
-                $actions[] = ['url' => 'javascript:onAddItemClick()', 'label' => trans('texts.add_item')];
+                $actions[] = ['url' => 'javascript:onAddItemClick()', 'label' => trans('texts.add_product')];
             }
 
             if ($invoice->canBePaid()) {

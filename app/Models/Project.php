@@ -24,6 +24,7 @@ class Project extends EntityModel
      */
     protected $fillable = [
         'name',
+        'task_rate',
     ];
 
     /**
@@ -53,6 +54,14 @@ class Project extends EntityModel
     public function client()
     {
         return $this->belongsTo('App\Models\Client')->withTrashed();
+    }
+
+    /**
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function tasks()
+    {
+        return $this->hasMany('App\Models\Task');
     }
 }
 

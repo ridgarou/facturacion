@@ -4,6 +4,8 @@ use App\Libraries\Utils;
 
 return [
 
+    'name' => env('APP_NAME', 'Invoice Ninja'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Debug Mode
@@ -139,6 +141,7 @@ return [
         'Illuminate\Validation\ValidationServiceProvider',
         'Illuminate\View\ViewServiceProvider',
         'Illuminate\Broadcasting\BroadcastServiceProvider',
+        'Illuminate\Notifications\NotificationServiceProvider',
 
         /*
          * Additional Providers
@@ -158,6 +161,7 @@ return [
         Codedge\Updater\UpdaterServiceProvider::class,
         Nwidart\Modules\LaravelModulesServiceProvider::class,
         Barryvdh\Cors\ServiceProvider::class,
+        PragmaRX\Google2FALaravel\ServiceProvider::class,
 
         /*
          * Application Service Providers...
@@ -171,6 +175,7 @@ return [
 
         'Barryvdh\LaravelIdeHelper\IdeHelperServiceProvider',
         'Davibennun\LaravelPushNotification\LaravelPushNotificationServiceProvider',
+
     ],
 
     /*
@@ -266,6 +271,8 @@ return [
         'DateUtils' => App\Libraries\DateUtils::class,
         'HTMLUtils' => App\Libraries\HTMLUtils::class,
         'Domain' => App\Constants\Domain::class,
+        'Google2FA' => PragmaRX\Google2FALaravel\Facade::class,
+
     ],
 
 ];

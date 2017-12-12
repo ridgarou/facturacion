@@ -15,22 +15,28 @@ NINJA.TEMPLATES = {
 
 function GetPdfMake(invoice, javascript, callback) {
 
-    // check if we need to add a second table for tasks
     var itemsTable = false;
-    if (invoice.hasSecondTable) {
-        var json = JSON.parse(javascript);
-        for (var i=0; i<json.content.length; i++) {
-            var item = json.content[i];
-            if (item.table && item.table.body == '$invoiceLineItems') {
-                itemsTable = JSON.stringify(item);
-                itemsTable = itemsTable.replace('$invoiceLineItems', '$taskLineItems');
-                //itemsTable = itemsTable.replace('$invoiceLineItemColumns', '$taskLineItemColumns');
-                break;
+    if (invoice.hasTasks) {
+        // check if we need to add a second table for tasks
+        if (invoice.hasSecondTable) {
+            var json = JSON.parse(javascript);
+            for (var i=0; i<json.content.length; i++) {
+                var item = json.content[i];
+                if (item.table && item.table.body == '$invoiceLineItems') {
+                    itemsTable = JSON.stringify(item);
+                    itemsTable = itemsTable.replace('$invoiceLineItems', '$taskLineItems');
+                    itemsTable = itemsTable.replace('$invoiceLineItemColumns', '$taskLineItemColumns');
+                    break;
+                }
             }
+            itemsTable = JSON.parse(itemsTable);
+            json.content.splice(i+1, 0, itemsTable);
+            javascript = JSON.stringify(json);
+        // use the single product table for tasks
+        } else {
+            javascript = javascript.replace('$invoiceLineItems', '$taskLineItems');
+            javascript = javascript.replace('$invoiceLineItemColumns', '$taskLineItemColumns');
         }
-        itemsTable = JSON.parse(itemsTable);
-        json.content.splice(i+1, 0, itemsTable);
-        javascript = JSON.stringify(json);
     }
 
     javascript = NINJA.decodeJavascript(invoice, javascript);
@@ -221,9 +227,9 @@ NINJA.decodeJavascript = function(invoice, javascript)
         'invoiceDetails': NINJA.invoiceDetails(invoice),
         'invoiceDetailsHeight': (NINJA.invoiceDetails(invoice).length * 16) + 16,
         'invoiceLineItems': invoice.is_statement ? NINJA.statementLines(invoice) : NINJA.invoiceLines(invoice),
-        'invoiceLineItemColumns': invoice.is_statement ? NINJA.statementColumns(invoice) : NINJA.invoiceColumns(invoice),
+        'invoiceLineItemColumns': invoice.is_statement ? NINJA.statementColumns(invoice) : NINJA.invoiceColumns(invoice, javascript),
         'taskLineItems': NINJA.invoiceLines(invoice, true),
-        //'taskLineItemColumns': NINJA.invoiceColumns(invoice),
+        'taskLineItemColumns': NINJA.invoiceColumns(invoice, javascript, true),
         'invoiceDocuments' : NINJA.invoiceDocuments(invoice),
         'quantityWidth': NINJA.quantityWidth(invoice),
         'taxWidth': NINJA.taxWidth(invoice),
@@ -235,9 +241,9 @@ NINJA.decodeJavascript = function(invoice, javascript)
         'subtotalsBalance': NINJA.subtotalsBalance(invoice),
         'balanceDue': formatMoneyInvoice(invoice.balance_amount, invoice),
         'invoiceFooter': NINJA.invoiceFooter(invoice),
-        'invoiceNumber': invoice.invoice_number || ' ',
-        'entityType': invoice.is_statement ? invoiceLabels.statement : invoice.is_quote ? invoiceLabels.quote : invoice.balance_amount < 0 ? invoiceLabels.credit_note : invoiceLabels.invoice,
-        'entityTypeUC': (invoice.is_statement ? invoiceLabels.statement : invoice.is_quote ? invoiceLabels.quote : invoice.balance_amount < 0 ? invoiceLabels.credit_note : invoiceLabels.invoice).toUpperCase(),
+        'invoiceNumber': invoice.is_statement ? '' : (invoice.invoice_number || ' '),
+        'entityType': NINJA.entityType(invoice),
+        'entityTypeUC': NINJA.entityType(invoice).toUpperCase(),
         'entityTaxType': invoice.is_statement ? invoiceLabels.statement : invoice.is_quote ? invoiceLabels.tax_quote : invoiceLabels.tax_invoice,
         'fontSize': NINJA.fontSize,
         'fontSizeLarger': NINJA.fontSize + 1,
@@ -342,7 +348,7 @@ NINJA.decodeJavascript = function(invoice, javascript)
             field = toSnakeCase(field);
 
             var value = getDescendantProp(invoice, field) || ' ';
-            value = doubleDollarSign(value);
+            value = doubleDollarSign(value) + '';
             value = value.replace(/\n/g, "\\n").replace(/\r/g, "\\r");
             javascript = javascript.replace(match, '"'+value+'"');
         }
@@ -351,6 +357,20 @@ NINJA.decodeJavascript = function(invoice, javascript)
     return javascript;
 }
 
+NINJA.entityType = function(invoice)
+{
+    if (invoice.is_delivery_note) {
+        return invoiceLabels.delivery_note;
+    } else if (invoice.is_statement) {
+        return invoiceLabels.statement;
+    } else if (invoice.is_quote) {
+        return invoiceLabels.quote;
+    } else if (invoice.balance_amount < 0) {
+        return invoiceLabels.credit_note;
+    } else {
+        return invoiceLabels.invoice;
+    }
+}
 
 NINJA.notesAndTerms = function(invoice)
 {
@@ -399,35 +419,74 @@ NINJA.statementLines = function(invoice)
     return NINJA.prepareDataTable(grid, 'invoiceItems');
 }
 
-NINJA.invoiceColumns = function(invoice)
+NINJA.invoiceColumns = function(invoice, design, isTasks)
 {
     var account = invoice.account;
     var columns = [];
+    var fields = NINJA.productFields(invoice, isTasks);
+    var hasDescription = fields.indexOf('product.description') >= 0;
+    var hasPadding = design.indexOf('"pageMargins":[0') == -1 && design.indexOf('"pageMargins": [0') == -1;
 
-    if (invoice.has_product_key) {
-        columns.push("15%");
+    for (var i=0; i<fields.length; i++) {
+        var field = fields[i];
+        var width = 0;
+
+        if (invoice.is_delivery_note) {
+            var skipFields = [
+                'product.unit_cost',
+                'product.rate',
+                'product.tax',
+                'product.line_total',
+            ];
+            if (skipFields.indexOf(field) >= 0) {
+                continue;
+            }
+        }
+
+        if (field == 'product.custom_value1') {
+            if (invoice.has_custom_item_value1) {
+                width = 10;
+            } else {
+                continue;
+            }
+        } else if (field == 'product.custom_value2') {
+            if (invoice.has_custom_item_value2) {
+                width = 10;
+            } else {
+                continue;
+            }
+        } else if (field == 'product.tax') {
+            if (invoice.has_item_taxes) {
+                width = 15;
+            } else {
+                continue;
+            }
+        } else if (field == 'product.description') {
+            width = 0;
+        } else {
+            width = 14;
+        }
+
+        if (width) {
+            // make the first and last columns of the Bold design a bit wider
+            if (! hasPadding) {
+                if (i == 0 || i == fields.length - 1) {
+                    width += 8;
+                }
+            }
+            if (! hasDescription) {
+                width = '*';
+            } else {
+                width += '%';
+            }
+        } else {
+            width = '*';
+        }
+
+        columns.push(width)
     }
 
-    columns.push("*")
-
-    if (invoice.has_custom_item_value1) {
-        columns.push("10%");
-    }
-    if (invoice.has_custom_item_value2) {
-        columns.push("10%");
-    }
-
-    var count = 3;
-    if (account.hide_quantity == '1') {
-        count -= 2;
-    }
-    if (account.show_item_taxes == '1') {
-        count++;
-    }
-    for (var i=0; i<count; i++) {
-        columns.push("14%");
-    }
-
+    //console.log(columns);
     return columns;
 }
 
@@ -448,57 +507,110 @@ NINJA.invoiceFooter = function(invoice)
 
 NINJA.quantityWidth = function(invoice)
 {
-    return invoice.account.hide_quantity == '1' ? '' : '"14%", ';
+    var fields = NINJA.productFields(invoice);
+    return fields.indexOf('product.quantity') >= 0 ? '"14%", ' : '';
 }
 
 NINJA.taxWidth = function(invoice)
 {
-    return invoice.account.show_item_taxes == '1' ? '"14%", ' : '';
+    var fields = NINJA.productFields(invoice);
+    return invoice.has_item_taxes && fields.indexOf('product.tax') >= 0 ? '"14%", ' : '';
+}
+
+NINJA.productFields = function(invoice, isTasks) {
+    var account = invoice.account;
+    var allFields = JSON.parse(account.invoice_fields);
+
+    if (allFields) {
+        if (isTasks && allFields.task_fields && allFields.task_fields.length) {
+            return allFields.task_fields;
+        } else if (! isTasks && allFields.product_fields && allFields.product_fields.length) {
+            return allFields.product_fields;
+        }
+    }
+
+    var fields = [
+        isTasks ? 'product.service' : 'product.item',
+        'product.description',
+        'product.custom_value1',
+        'product.custom_value2',
+        isTasks ? 'product.rate' : 'product.unit_cost',
+        isTasks ? 'product.hours' : 'product.quantity',
+        'product.tax',
+        'product.line_total',
+    ];
+
+    // add backwards compatibility for 'hide qty' setting
+    if (invoice.account.hide_quantity == '1' && ! isTasks) {
+        fields.splice(5, 1);
+    }
+
+    return fields;
 }
 
 NINJA.invoiceLines = function(invoice, isSecondTable) {
     var account = invoice.account;
     var total = 0;
     var shownItem = false;
-    var hideQuantity = invoice.account.hide_quantity == '1';
-    var showItemTaxes = invoice.account.show_item_taxes == '1';
     var isTasks = isSecondTable || (invoice.hasTasks && !invoice.hasStandard);
-
     var grid = [[]];
     var styles = ['tableHeader'];
+    var skipFields = [
+        'product.unit_cost',
+        'product.rate',
+        'product.tax',
+        'product.line_total',
+    ];
+
     if (isSecondTable) {
         styles.push('secondTableHeader');
     }
 
-    if (invoice.has_product_key) {
-        grid[0].push({text: isTasks ? invoiceLabels.service : invoiceLabels.item, style: styles.concat('itemTableHeader')});
+    var fields = NINJA.productFields(invoice, isTasks);
+    var hasDescription = fields.indexOf('product.description') >= 0;
+
+    for (var i=0; i<fields.length; i++) {
+        var field = fields[i].split('.')[1]; // split to remove 'product.'
+
+        if (invoice.is_delivery_note && skipFields.indexOf(fields[i]) >= 0) {
+            continue;
+        }
+
+        var headerStyles = styles.concat([snakeToCamel(field), snakeToCamel(field) + 'TableHeader']);
+        var value = invoiceLabels[field];
+
+        if (field == 'custom_value1') {
+            if (invoice.has_custom_item_value1) {
+                value = account.custom_invoice_item_label1;
+            } else {
+                continue;
+            }
+        } else if (field == 'custom_value2') {
+            if (invoice.has_custom_item_value2) {
+                value = account.custom_invoice_item_label2;
+            } else {
+                continue;
+            }
+        } else if (field == 'tax' && ! invoice.has_item_taxes) {
+            continue;
+        } else if (field == 'unit_cost' || field == 'rate' || field == 'hours') {
+            headerStyles.push('cost');
+        }
+
+        if (i == 0) {
+            headerStyles.push('firstColumn');
+        } else if (i == fields.length - 1) {
+            headerStyles.push('lastColumn');
+        }
+
+        grid[0].push({text: value, style: headerStyles});
     }
 
-    grid[0].push({text: invoiceLabels.description, style: styles.concat('descriptionTableHeader')});
-
-    if (invoice.has_custom_item_value1) {
-        grid[0].push({text: account.custom_invoice_item_label1, style: styles.concat('custom1TableHeader')});
-    }
-    if (invoice.has_custom_item_value2) {
-        grid[0].push({text: account.custom_invoice_item_label2, style: styles.concat('custom2TableHeader')});
-    }
-
-    if (!hideQuantity) {
-        grid[0].push({text: isTasks ? invoiceLabels.rate : invoiceLabels.unit_cost, style: styles.concat('costTableHeader')});
-        grid[0].push({text: isTasks ? invoiceLabels.hours : invoiceLabels.quantity, style: styles.concat('qtyTableHeader')});
-    }
-    if (showItemTaxes) {
-        grid[0].push({text: invoiceLabels.tax, style: styles.concat('taxTableHeader')});
-    }
-
-    grid[0].push({text: invoiceLabels.line_total, style: styles.concat('lineTotalTableHeader')});
-
-    for (var i = 0; i < invoice.invoice_items.length; i++) {
-
+    for (var i=0; i<invoice.invoice_items.length; i++) {
         var row = [];
         var item = invoice.invoice_items[i];
-        var cost = formatMoneyInvoice(item.cost, invoice, null, getPrecision(item.cost));
-        var qty = NINJA.parseFloat(item.qty) ? roundSignificant(NINJA.parseFloat(item.qty)) + '' : '';
+        var cost = NINJA.parseFloat(item.cost) ? formatMoneyInvoice(item.cost, invoice, null, getPrecision(item.cost)) : ' ';
+        var qty = NINJA.parseFloat(item.qty) ? roundSignificant(NINJA.parseFloat(item.qty)) + '' : ' ';
         var notes = item.notes;
         var productKey = item.product_key;
         var tax1 = '';
@@ -516,13 +628,11 @@ NINJA.invoiceLines = function(invoice, isSecondTable) {
             }
         }
 
-        if (showItemTaxes) {
-            if (parseFloat(item.tax_rate1) != 0) {
-                tax1 = parseFloat(item.tax_rate1);
-            }
-            if (parseFloat(item.tax_rate2) != 0) {
-                tax2 = parseFloat(item.tax_rate2);
-            }
+        if (parseFloat(item.tax_rate1) != 0) {
+            tax1 = parseFloat(item.tax_rate1);
+        }
+        if (parseFloat(item.tax_rate2) != 0) {
+            tax2 = parseFloat(item.tax_rate2);
         }
 
         // show at most one blank line
@@ -540,7 +650,7 @@ NINJA.invoiceLines = function(invoice, isSecondTable) {
             custom_value2 = processVariables(item.custom_value2);
         }
 
-        var lineTotal = roundSignificant(NINJA.parseFloat(item.cost)) * roundSignificant(NINJA.parseFloat(item.qty));
+        var lineTotal = roundSignificant(NINJA.parseFloat(item.cost) * NINJA.parseFloat(item.qty));
         if (account.include_item_taxes_inline == '1') {
             var taxAmount1 = 0;
             var taxAmount2 = 0;
@@ -553,41 +663,70 @@ NINJA.invoiceLines = function(invoice, isSecondTable) {
             lineTotal += taxAmount1 + taxAmount2;
         }
 
-        lineTotal = formatMoneyInvoice(lineTotal, invoice);
+        if (lineTotal != 0) {
+            lineTotal = formatMoneyInvoice(lineTotal, invoice);
+        }
         rowStyle = (grid.length % 2 == 0) ? 'even' : 'odd';
 
-        if (invoice.has_product_key) {
-            row.push({style:["productKey", rowStyle], text:productKey || ' '}); // product key can be blank when selecting from a datalist
-        }
-        row.push({style:["notes", rowStyle], stack:[{text:notes || ' '}]});
-        if (invoice.has_custom_item_value1) {
-            row.push({style:["customValue1", rowStyle], text:custom_value1 || ' '});
-        }
-        if (invoice.has_custom_item_value2) {
-            row.push({style:["customValue2", rowStyle], text:custom_value2 || ' '});
-        }
-        if (!hideQuantity) {
-            row.push({style:["cost", rowStyle], text:cost});
-            row.push({style:["quantity", rowStyle], text:formatAmount(qty, invoice.client.currency_id, getPrecision(qty)) || ' '});
-        }
-        if (showItemTaxes) {
-            var str = ' ';
-            if (item.tax_name1) {
-                str += tax1.toString() + '%';
+        for (var j=0; j<fields.length; j++) {
+            var field = fields[j].split('.')[1]; // split to remove 'product.'
+
+            if (invoice.is_delivery_note && skipFields.indexOf(fields[j]) >= 0) {
+                continue;
             }
-            if (item.tax_name2) {
-                if (item.tax_name1) {
-                    str += '  ';
+
+            var value = item[field];
+            var styles = [snakeToCamel(field), rowStyle];
+
+            if (field == 'custom_value1' && ! invoice.has_custom_item_value1) {
+                continue;
+            } else if (field == 'custom_value2' && ! invoice.has_custom_item_value2) {
+                continue;
+            } else if (field == 'tax' && ! invoice.has_item_taxes) {
+                continue;
+            }
+
+            if (field == 'item' || field == 'service') {
+                value = item.product_key;
+                styles.push('productKey');
+            } else if (field == 'description') {
+                value = item.notes;
+            } else if (field == 'unit_cost' || field == 'rate') {
+                value = cost;
+                styles.push('cost');
+            } else if (field == 'quantity' || field == 'hours') {
+                value = qty;
+                if (field == 'hours') {
+                    styles.push('cost');
                 }
-                str += tax2.toString() + '%';
+            } else if (field == 'tax') {
+                value = ' ';
+                if (item.tax_name1) {
+                    value += tax1.toString() + '%';
+                }
+                if (item.tax_name2) {
+                    if (item.tax_name1) {
+                        value += '  ';
+                    }
+                    value += tax2.toString() + '%';
+                }
+            } else if (field == 'line_total') {
+                value = lineTotal;
             }
-            row.push({style:["tax", rowStyle], text:str});
+
+            if (j == 0) {
+                styles.push('firstColumn');
+            } else if (j == fields.length - 1) {
+                styles.push('lastColumn');
+            }
+
+            row.push({text:value || ' ', style:styles});
         }
-        row.push({style:["lineTotal", rowStyle], text:lineTotal || ' '});
 
         grid.push(row);
     }
 
+    //console.log(JSON.stringify(grid));
     return NINJA.prepareDataTable(grid, 'invoiceItems');
 }
 
@@ -645,8 +784,8 @@ NINJA.statementSubtotals = function(invoice)
 
 NINJA.subtotals = function(invoice, hideBalance)
 {
-    if (!invoice) {
-        return;
+    if (! invoice || invoice.is_delivery_note) {
+        return [[]];
     }
 
     var account = invoice.account;
@@ -721,6 +860,10 @@ NINJA.subtotals = function(invoice, hideBalance)
 }
 
 NINJA.subtotalsBalance = function(invoice) {
+    if (invoice.is_delivery_note) {
+        return [[]];
+    }
+
     var isPartial = NINJA.parseFloat(invoice.partial);
     return [[
         {text: isPartial ? invoiceLabels.partial_due : (invoice.is_quote || invoice.balance_amount < 0 ? invoiceLabels.total : invoiceLabels.balance_due), style:['subtotalsLabel', 'subtotalsBalanceDueLabel']},
@@ -816,6 +959,17 @@ NINJA.invoiceDetails = function(invoice) {
 
 
 NINJA.renderField = function(invoice, field, twoColumn) {
+    if (invoice.is_delivery_note) {
+        var skipFields = [
+            'invoice.due_date',
+            'invoice.balance_due',
+            'invoice.partial_due',
+        ];
+        if (skipFields.indexOf(field) >= 0) {
+            return false;
+        }
+    }
+
     var client = invoice.client;
     if (!client) {
         return false;
@@ -842,24 +996,49 @@ NINJA.renderField = function(invoice, field, twoColumn) {
             label = invoiceLabels.vat_number;
         }
     } else if (field == 'client.address1') {
-        value = client.address1;
+        if (invoice.is_delivery_note && client.shipping_address1) {
+            value = client.shipping_address1;
+        } else {
+            value = client.address1;
+        }
     } else if (field == 'client.address2') {
-        value = client.address2;
+        if (invoice.is_delivery_note && client.shipping_address1) {
+            value = client.shipping_address2;
+        } else {
+            value = client.address2;
+        }
     } else if (field == 'client.city_state_postal') {
         var cityStatePostal = '';
-        if (client.city || client.state || client.postal_code) {
-            var swap = client.country && client.country.swap_postal_code;
-            cityStatePostal = formatAddress(client.city, client.state, client.postal_code, swap);
+        if (invoice.is_delivery_note && client.shipping_address1) {
+            if (client.shipping_city || client.shipping_state || client.shipping_postal_code) {
+                var swap = client.shipping_country && client.shipping_country.swap_postal_code;
+                cityStatePostal = formatAddress(client.shipping_city, client.shipping_state, client.shipping_postal_code, swap);
+            }
+        } else {
+            if (client.city || client.state || client.postal_code) {
+                var swap = client.country && client.country.swap_postal_code;
+                cityStatePostal = formatAddress(client.city, client.state, client.postal_code, swap);
+            }
         }
         value = cityStatePostal;
     } else if (field == 'client.postal_city_state') {
         var postalCityState = '';
-        if (client.city || client.state || client.postal_code) {
-            postalCityState = formatAddress(client.city, client.state, client.postal_code, true);
+        if (invoice.is_delivery_note && client.shipping_address1) {
+            if (client.shipping_city || client.shipping_state || client.shipping_postal_code) {
+                postalCityState = formatAddress(client.shipping_city, client.shipping_state, client.shipping_postal_code, true);
+            }
+        } else {
+            if (client.city || client.state || client.postal_code) {
+                postalCityState = formatAddress(client.city, client.state, client.postal_code, true);
+            }
         }
         value = postalCityState;
     } else if (field == 'client.country') {
-        value = client.country ? client.country.name : '';
+        if (invoice.is_delivery_note && client.shipping_address1) {
+            value = client.shipping_country ? client.shipping_country.name : '';
+        } else {
+            value = client.country ? client.country.name : '';
+        }
     } else if (field == 'client.email') {
         value = contact.email == clientName ? '' : contact.email;
     } else if (field == 'client.phone') {
@@ -943,7 +1122,13 @@ NINJA.renderField = function(invoice, field, twoColumn) {
         value = invoice.invoice_date;
     } else if (field == 'invoice.due_date') {
         label = invoice.is_quote ? invoiceLabels.valid_until : invoiceLabels.due_date;
-        value = invoice.is_recurring ? false : invoice.due_date;
+        if (invoice.is_recurring) {
+            value = false;
+        } else if (invoice.partial_due_date) {
+            value = invoice.partial_due_date;
+        } else {
+            value = invoice.due_date;
+        }
     } else if (field == 'invoice.custom_text_value1') {
         if (invoice.custom_text_value1 && account.custom_invoice_text_label1) {
             label = invoice.account.custom_invoice_text_label1;
@@ -957,7 +1142,7 @@ NINJA.renderField = function(invoice, field, twoColumn) {
     } else if (field == 'invoice.balance_due') {
         label = invoice.is_quote || invoice.balance_amount < 0 ? invoiceLabels.total : invoiceLabels.balance_due;
         value = formatMoneyInvoice(invoice.total_amount, invoice);
-    } else if (field == invoice.partial_due) {
+    } else if (field == 'invoice.partial_due') {
         if (NINJA.parseFloat(invoice.partial)) {
             label = invoiceLabels.partial_due;
             value = formatMoneyInvoice(invoice.balance_amount, invoice);
@@ -1126,7 +1311,7 @@ NINJA.parseMarkdownText = function(val, groupText)
         ['\\\*(\\\w.+?)\\\*', {'italics': true}], // *value*
         ['^###(.*)', {'style': 'help'}], // ### Small/gray help
         ['^##(.*)', {'style': 'subheader'}], // ## Header
-        ['^#(.*)', {'style': 'header'}] // # Subheader
+        ['^#(.*)', {'style': 'fullheader'}] // # Subheader
     ];
 
     var parts = typeof val === 'string' ? [val] : val;
