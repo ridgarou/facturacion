@@ -8,7 +8,9 @@
 
 	<style type="text/css">
         select.tax-select {
-            width: 50%;
+            <?php  // *** Modificacion de FACTURACION: ?>
+            /*! width: 50%; */
+            <?php  // *** Fin de Modificacion de FACTURACION: ?>
             float: left;
         }
 
@@ -294,7 +296,9 @@
 		<tfoot>
 			<tr>
 				<td class="hide-border"/>
-				<td class="hide-border" colspan="{{ 2 + ($account->showCustomField('custom_invoice_item_label1') ? 1 : 0) + ($account->showCustomField('custom_invoice_item_label2') ? 1 : 0) }}" rowspan="10" style="vertical-align:top">
+                <?php  // *** Modificacion de FACTURACION: ?>
+				<td class="hide-border" colspan="{{ 1 + ($account->showCustomField('custom_invoice_item_label1') ? 1 : 0) + ($account->showCustomField('custom_invoice_item_label2') ? 1 : 0) }}" rowspan="10" style="vertical-align:top">
+                <?php  // *** Fin de modificacion de FACTURACION: ?>
 					<br/>
                     <div role="tabpanel">
 

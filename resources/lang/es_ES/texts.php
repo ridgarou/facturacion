@@ -299,11 +299,7 @@ $LANG = array(
     'specify_colors' => 'Especificar colores',
     'specify_colors_label' => 'Seleccionar los colores para usar en las Facturas',
     'chart_builder' => 'Constructor de Gráficas',
-<<<<<<< HEAD
     'ninja_email_footer' => 'Creado por :site. Crear. Enviar. Recibir sus Pagos.',
-=======
-    'ninja_email_footer' => 'Creado por :site | Crea. Envia. Recibe tus Pagos.',
->>>>>>> refs/remotes/origin/master
     'go_pro' => 'Hazte Pro',
     'quote' => 'Presupuesto',
     'quotes' => 'Presupuestos',
@@ -700,11 +696,7 @@ $LANG = array(
     'invalid_credentials' => 'Las credenciales no coinciden con nuestros registros',
     'show_all_options' => 'Mostrar todas las opciones',
     'user_details' => 'Detalles de Usuario',
-<<<<<<< HEAD
     'oneclick_login' => 'Login con un Click',
-=======
-    'oneclick_login' => 'Cuenta Conectada',
->>>>>>> refs/remotes/origin/master
     'disable' => 'Deshabilitado',
     'invoice_quote_number' => 'Números de Factura y Presupuesto',
     'invoice_charges' => 'Cargos de Factura',
@@ -1379,13 +1371,9 @@ Una vez que tenga los montos, vuelva a esta página de métodos de pago y haga c
 
     // Frequencies
     'freq_inactive' => 'Inactivo',
-<<<<<<< HEAD
-    'freq_weekly' => 'Semanal',
-=======
     'freq_daily' => 'Diariamente',
     'freq_weekly' => 'Semanal',
     'freq_biweekly' => 'Quincenal',
->>>>>>> refs/remotes/origin/master
     'freq_two_weeks' => 'Dos semanas',
     'freq_four_weeks' => 'Cuatro semanas',
     'freq_monthly' => 'Mensual',

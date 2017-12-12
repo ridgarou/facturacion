@@ -37,9 +37,9 @@
             </div>
         </td>
         @if ($account->showCustomField('custom_invoice_item_label1'))
-            <td>
-                <input data-bind="value: custom_value1, valueUpdate: 'afterkeydown', attr: {name: 'invoice_items[{{ $isTasks ? 'T' : '' }}' + $index() + '][custom_value1]'}" class="form-control invoice-item"/>
-            </td>
+        <td>
+            <input data-bind="value: custom_value1, valueUpdate: 'afterkeydown', attr: {name: 'invoice_items[{{ $isTasks ? 'T' : '' }}' + $index() + '][custom_value1]'}" class="form-control invoice-item"/>
+        </td>
         @endif
         <?php  // *** Fin de modificacion de FACTURACION: ?>
         <td>
@@ -50,9 +50,9 @@
                 <input type="text" data-bind="value: invoice_item_type_id, attr: {name: 'invoice_items[{{ $isTasks ? 'T' : '' }}' + $index() + '][invoice_item_type_id]'}" style="display: none"/>
         </td>
         @if ($account->showCustomField('custom_invoice_item_label2'))
-            <td>
-                <input data-bind="value: custom_value2, valueUpdate: 'afterkeydown', attr: {name: 'invoice_items[{{ $isTasks ? 'T' : '' }}' + $index() + '][custom_value2]'}" class="form-control invoice-item"/>
-            </td>
+        <td>
+            <input data-bind="value: custom_value2, valueUpdate: 'afterkeydown', attr: {name: 'invoice_items[{{ $isTasks ? 'T' : '' }}' + $index() + '][custom_value2]'}" class="form-control invoice-item"/>
+        </td>
         @endif
         <td>
             <input data-bind="value: prettyCost, valueUpdate: 'afterkeydown', attr: {name: 'invoice_items[{{ $isTasks ? 'T' : '' }}' + $index() + '][cost]'}"
