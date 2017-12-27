@@ -33511,6 +33511,7 @@ NINJA.TEMPLATES = {
 		taxWidth : NINJA.taxWidth(t),
 		clientDetails : NINJA.clientDetails(t),
 		// *** Modificacion de FACTURACION:
+		clientVatNumber: NINJA.clientVatNumber(t),
 		invoiceNotes : NINJA.invoiceNotes(t),
 		invoiceTerms : NINJA.invoiceTerms(t),
 		// *** Fin de Modificacion de FACTURACION:
@@ -33686,7 +33687,9 @@ NINJA.TEMPLATES = {
 		if ("product.custom_value1" == c) {
 			if (!t.has_custom_item_value1)
 				continue;
-			l = 10
+			//Modificacion de FACTURACION:
+			l = 13
+			//Fin de Modificacion de FACTURACION:
 		} else if ("product.custom_value2" == c) {
 			if (!t.has_custom_item_value2)
 				continue;
@@ -33696,7 +33699,9 @@ NINJA.TEMPLATES = {
 				continue;
 			l = 15
 		} else
-			l = "product.description" == c ? 0 : 14;
+			//Modificacion de FACTURACION:
+			l = "product.description" == c ? 0 : 10;
+			//Fin de Modificacion de FACTURACION:
 		l ? (s || 0 != r && r != o.length - 1 || (l += 8), a ? l += "%" : l = "*") : l = "*",
 		i.push(l)
 	}
@@ -33707,7 +33712,9 @@ NINJA.TEMPLATES = {
 	t.features.invoice_settings || 3 != t.invoice_design_id ? e || " " : e ? e.substring(0, 200) : " "
 }, NINJA.quantityWidth = function (t) {
 	var e = NINJA.productFields(t);
-	return e.indexOf("product.quantity") >= 0 ? '"14%", ' : ""
+	//Modificacion de FACTURACION:
+	return e.indexOf("product.quantity") >= 0 ? '"7%", ' : ""
+	//Fin de Modificacion de FACTURACION:
 }, NINJA.taxWidth = function (t) {
 	var e = NINJA.productFields(t);
 	return t.has_item_taxes && e.indexOf("product.tax") >= 0 ? '"14%", ' : ""
@@ -34126,6 +34133,17 @@ NINJA.TEMPLATES = {
 		s && i.push(s)
 	}
 	return NINJA.prepareDataList(i, "clientDetails")
+//Modificacion de FACTURACION:
+}, NINJA.clientVatNumber = function(invoice) {
+	var client = invoice.client;
+    var data = [
+    [
+        {text: 'NIF/CIF de Cliente:   ', style: ['invoiceNumberLabel']},
+        {text: client.vat_number}
+    ]
+	];
+	return NINJA.prepareDataPairs(data, 'clientVatNumber');
+//Fin de Modificacion de FACTURACION:
 }, NINJA.getPrimaryColor = function (t) {
 	return NINJA.primaryColor ? NINJA.primaryColor : t
 }, NINJA.getSecondaryColor = function (t) {
