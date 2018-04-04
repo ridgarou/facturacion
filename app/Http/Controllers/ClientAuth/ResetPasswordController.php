@@ -4,11 +4,9 @@ namespace App\Http\Controllers\ClientAuth;
 
 use Password;
 use Config;
-use App\Models\PasswordReset;
 use App\Http\Controllers\Controller;
 use Illuminate\Foundation\Auth\ResetsPasswords;
 use Illuminate\Http\Request;
-use App\Models\PasswordReset;
 
 class ResetPasswordController extends Controller
 {
@@ -56,14 +54,8 @@ class ResetPasswordController extends Controller
 
     public function showResetForm(Request $request, $token = null)
     {
-        $passwordReset = PasswordReset::whereToken($token)->first();
-
-        if (! $passwordReset) {
-            return redirect('login')->withMessage(trans('texts.invalid_code'));
-        }
-
         return view('clientauth.passwords.reset')->with(
-            ['token' => $token, 'email' => $passwordReset->email]
+            ['token' => $token]
         );
     }
 

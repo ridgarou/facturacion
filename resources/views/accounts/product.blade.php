@@ -5,6 +5,7 @@
 
     {!! Former::open($url)
             ->method($method)
+            ->autocomplete('off')
             ->rules(['product_key' => 'required|max:255'])
             ->addClass('col-lg-10 col-lg-offset-1 main-form warn-on-exit') !!}
 
@@ -29,10 +30,16 @@
 
                     @if ($account->hasFeature(FEATURE_INVOICE_SETTINGS))
                         @if ($account->custom_invoice_item_label1)
-                            {!! Former::text('custom_value1')->label(e($account->custom_invoice_item_label1)) !!}
+                            @include('partials.custom_field', [
+        						'field' => 'custom_value1',
+        						'label' => $account->custom_invoice_item_label1
+        					])
                         @endif
                         @if ($account->custom_invoice_item_label2)
-                            {!! Former::text('custom_value2')->label(e($account->custom_invoice_item_label2)) !!}
+                            @include('partials.custom_field', [
+        						'field' => 'custom_value2',
+        						'label' => $account->custom_invoice_item_label2
+        					])
                         @endif
                     @endif
 
@@ -46,7 +53,7 @@
             </div>
         </div>
     </div>
-    
+
     <center class="buttons">
         {!! Button::normal(trans('texts.cancel'))->large()->asLinkTo(HTMLUtils::previousUrl('/products'))->appendIcon(Icon::create('remove-circle')) !!}
         {!! Button::success(trans('texts.save'))->submit()->large()->appendIcon(Icon::create('floppy-disk')) !!}

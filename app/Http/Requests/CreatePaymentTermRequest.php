@@ -2,36 +2,19 @@
 
 namespace App\Http\Requests;
 
-use App\Models\Expense;
 use App\Models\Invoice;
 
-class CreateDocumentRequest extends DocumentRequest
+class CreatePaymentTermRequest extends PaymentTermRequest
 {
-    protected $autoload = [
-        ENTITY_INVOICE,
-        ENTITY_EXPENSE,
-    ];
-
     /**
      * Determine if the user is authorized to make this request.
      *
      * @return bool
      */
+
     public function authorize()
     {
-        if (! $this->user()->hasFeature(FEATURE_DOCUMENTS)) {
-            return false;
-        }
-        
-        if ($this->invoice && $this->user()->cannot('edit', $this->invoice)) {
-            return false;
-        }
-
-        if ($this->expense && $this->user()->cannot('edit', $this->expense)) {
-            return false;
-        }
-
-        return $this->user()->can('create', ENTITY_DOCUMENT);
+        return $this->user()->can('create', ENTITY_PAYMENT_TERM);
     }
 
     /**
@@ -39,10 +22,16 @@ class CreateDocumentRequest extends DocumentRequest
      *
      * @return array
      */
+
     public function rules()
     {
-        return [
-            //'file' => 'mimes:jpg'
+
+        $rules = [
+            'num_days' => 'required|numeric|unique:payment_terms,num_days,,id,account_id,' . $this->user()->account_id . ',deleted_at,NULL'
+                . '|unique:payment_terms,num_days,,id,account_id,0,deleted_at,NULL',
         ];
+
+
+        return $rules;
     }
 }

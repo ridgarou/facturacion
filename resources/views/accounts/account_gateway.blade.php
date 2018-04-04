@@ -34,7 +34,7 @@
         {!! Former::populateField('show_address', intval($accountGateway->show_address)) !!}
         {!! Former::populateField('show_shipping_address', intval($accountGateway->show_shipping_address)) !!}
         {!! Former::populateField('update_address', intval($accountGateway->update_address)) !!}
-        {!! Former::populateField('publishable_key', $accountGateway->getPublishableStripeKey() ? str_repeat('*', strlen($accountGateway->getPublishableStripeKey())) : '') !!}
+        {!! Former::populateField('publishable_key', $accountGateway->getPublishableKey() ? str_repeat('*', strlen($accountGateway->getPublishableKey())) : '') !!}
         {!! Former::populateField('enable_ach', $accountGateway->getAchEnabled() ? 1 : 0) !!}
 		{!! Former::populateField('enable_apple_pay', $accountGateway->getApplePayEnabled() ? 1 : 0) !!}
         {!! Former::populateField('enable_sofort', $accountGateway->getSofortEnabled() ? 1 : 0) !!}
@@ -84,13 +84,12 @@
         @endif
     @endif
 
+	<span id="publishableKey" style="display: none">
+		{!! Former::text('publishable_key') !!}
+	</span>
+
     @foreach ($gateways as $gateway)
-
         <div id="gateway_{{ $gateway->id }}_div" class='gateway-fields' style="display: none">
-            @if ($gateway->id == GATEWAY_STRIPE)
-                {!! Former::text('publishable_key') !!}
-            @endif
-
             @foreach ($gateway->fields as $field => $details)
 
                 @if ($details && (!$accountGateway || !$accountGateway->getConfigField($field)) && !is_array($details) && !is_bool($details))
@@ -132,6 +131,11 @@
                            ->text(trans('texts.braintree_enable_paypal'))
                            ->value(1) !!}
                 @endif
+			@elseif ($gateway->id == GATEWAY_GOCARDLESS)
+				{!! Former::text('webhook_url')
+						->readonly(true)
+						->value(url(env('WEBHOOK_PREFIX','') . 'payment_hook/' . $account->account_key . '/' . GATEWAY_GOCARDLESS))
+						->help('gocardless_webhook_help_link_text') !!}
             @endif
 
             @if ($gateway->getHelp())
@@ -200,11 +204,11 @@
 			{!! Former::checkbox('enable_apple_pay')
                 ->label(trans('texts.apple_pay'))
                 ->text(trans('texts.enable_apple_pay'))
-				->disabled(Utils::isNinja() && ! $account->subdomain)
-				->help((Utils::isNinja() && ! $account->subdomain) ? trans('texts.requires_subdomain', [
+				->disabled(Utils::isNinjaProd() && ! $account->subdomain)
+				->help((Utils::isNinjaProd() && ! $account->subdomain) ? trans('texts.requires_subdomain', [
 					'link' => link_to('/settings/client_portal', trans('texts.subdomain_is_set'), ['target' => '_blank'])
 				]) : ($accountGateway && $accountGateway->getApplePayEnabled() && Utils::isRootFolder() && ! $accountGateway->getAppleMerchantId() ? 'verification_file_missing' :
-					Utils::isNinja() ? trans('texts.apple_pay_domain', [
+					Utils::isNinjaProd() ? trans('texts.apple_pay_domain', [
 						'domain' => $account->subdomain . '.' . APP_DOMAIN, 'link' => link_to('https://dashboard.stripe.com/account/apple_pay', 'Stripe', ['target' => '_blank']),
 					]) : ''))
                 ->value(1) !!}
@@ -215,10 +219,12 @@
 						->addGroupClass('verification-file') !!}
 			@endif
 
-            {!! Former::checkbox('enable_bitcoin')
-                ->label(trans('texts.bitcoin'))
-                ->text(trans('texts.enable_bitcoin'))
-                ->value(1) !!}
+			@if ($accountGateway && $accountGateway->getBitcoinEnabled())
+				{!! Former::checkbox('enable_bitcoin')
+					->label(trans('texts.bitcoin'))
+					->text(trans('texts.enable_bitcoin'))
+					->value(1) !!}
+			@endif
 
             {!! Former::checkbox('enable_alipay')
                 ->label(trans('texts.alipay'))
@@ -231,14 +237,14 @@
                     <label class="control-label col-lg-4 col-sm-4">{{ trans('texts.webhook_url') }}</label>
                     <div class="col-lg-8 col-sm-8 help-block">
                         <input type="text"  class="form-control" onfocus="$(this).select()" readonly value="{{ URL::to(env('WEBHOOK_PREFIX','').'payment_hook/'.$account->account_key.'/'.GATEWAY_STRIPE) }}">
-                        <div class="help-block"><strong>{!! trans('texts.stripe_webhook_help', [
+                        <div class="help-block">{!! trans('texts.stripe_webhook_help', [
                         'link'=>'<a href="https://dashboard.stripe.com/account/webhooks" target="_blank">'.trans('texts.stripe_webhook_help_link_text').'</a>'
-                    ]) !!}</strong></div>
+                    ]) !!}</div>
                     </div>
                 </div>
             </div>
 
-            <div class="stripe-ach-options">
+            <div class="stripe-ach-options" style="display:none">
                 <div class="form-group">
                     <div class="col-sm-8 col-sm-offset-4">
                         <h4>{{trans('texts.plaid')}}</h4>
@@ -314,6 +320,8 @@
         } else {
             $('.stripe-ach').hide();
         }
+
+		$('#publishableKey').toggle([{{ GATEWAY_STRIPE }}, {{ GATEWAY_PAYMILL }}].indexOf(gateway.id) >= 0);
     }
 
     function gatewayLink(url) {
@@ -337,7 +345,7 @@
         var enableBicoin = $('#enable_bitcoin').is(':checked');
 		var enableApplePay = $('#enable_apple_pay').is(':checked');
         $('.stripe-webhook-options').toggle(enableAch || enableAlipay || enableSofort || enableSepa || enableBicoin);
-        $('.stripe-ach-options').toggle(enableAch);
+        $('.stripe-ach-options').toggle(enableAch && {{ $accountGateway && $accountGateway->getPlaidClientId() ? 'true' : 'false' }});
 		$('.verification-file').toggle(enableApplePay);
     }
 
