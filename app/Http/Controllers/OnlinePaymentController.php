@@ -75,14 +75,14 @@ class OnlinePaymentController extends BaseController
             ]);
         }
 
-        if (! $invitation->invoice->canBePaid() && ! request()->update) {
+        if (! request()->capture && ! $invitation->invoice->canBePaid()) {
             return redirect()->to('view/' . $invitation->invitation_key);
         }
 
         $invitation = $invitation->load('invoice.client.account.account_gateways.gateway');
         $account = $invitation->account;
 
-        if ($account->requiresAuthorization($invitation->invoice) && ! session('authorized:' . $invitation->invitation_key)) {
+        if (! request()->capture && $account->requiresAuthorization($invitation->invoice) && ! session('authorized:' . $invitation->invitation_key)) {
             return redirect()->to('view/' . $invitation->invitation_key);
         }
 
@@ -126,14 +126,14 @@ class OnlinePaymentController extends BaseController
 
         $paymentDriver = $invitation->account->paymentDriver($invitation, $gatewayTypeId);
 
-        if (! $invitation->invoice->canBePaid() && ! request()->update) {
+        if (! $invitation->invoice->canBePaid() && ! request()->capture) {
             return redirect()->to('view/' . $invitation->invitation_key);
         }
 
         try {
             $paymentDriver->completeOnsitePurchase($request->all());
 
-            if (request()->update) {
+            if (request()->capture) {
                 return redirect('/client/dashboard')->withMessage(trans('texts.updated_payment_details'));
             } elseif ($paymentDriver->isTwoStep()) {
                 Session::flash('warning', trans('texts.bank_account_verification_next_steps'));
@@ -356,12 +356,14 @@ class OnlinePaymentController extends BaseController
                 return redirect()->to("{$failureUrl}/?error=" . $validator->errors()->first());
             }
 
-            $data = [
-                'currency_id' => $account->currency_id,
-                'contact' => Input::all(),
-                'custom_value1' => Input::get('custom_client1'),
-                'custom_value2' => Input::get('custom_client2'),
-            ];
+            $data = request()->all();
+            $data['currency_id'] = $account->currency_id;
+            $data['custom_value1'] = request()->custom_client1;
+            $data['custom_value2'] = request()->custom_client2;
+            $data['contact'] = request()->all();
+            $data['contact']['custom_value1'] = request()->custom_contact1;
+            $data['contact']['custom_value2'] = request()->custom_contact2;
+
             if (request()->currency_code) {
                 $data['currency_code'] = request()->currency_code;
             }
@@ -388,7 +390,7 @@ class OnlinePaymentController extends BaseController
                 'product_key' => $product->product_key,
                 'notes' => $product->notes,
                 'cost' => $product->cost,
-                'qty' => 1,
+                'qty' => request()->quantity ?: (request()->qty ?: 1),
                 'tax_rate1' => $product->tax_rate1,
                 'tax_name1' => $product->tax_name1 ?: '',
                 'tax_rate2' => $product->tax_rate2,
@@ -425,20 +427,23 @@ class OnlinePaymentController extends BaseController
     {
         if (Utils::isNinja()) {
             $subdomain = Utils::getSubdomain(\Request::server('HTTP_HOST'));
+            if (! $subdomain || $subdomain == 'app') {
+                exit('Invalid subdomain');
+            }
             $account = Account::whereSubdomain($subdomain)->first();
         } else {
             $account = Account::first();
         }
 
         if (! $account) {
-            exit("Account not found");
+            exit('Account not found');
         }
 
         $accountGateway = $account->account_gateways()
             ->whereGatewayId(GATEWAY_STRIPE)->first();
 
         if (! $account) {
-            exit("Apple merchant id not set");
+            exit('Apple merchant id not set');
         }
 
         echo $accountGateway->getConfigField('appleMerchantId');

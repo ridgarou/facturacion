@@ -187,6 +187,7 @@
         }
 
         self.filterState = ko.observable('all');
+        self.filterStatusId = ko.observable(false);
         self.sortField = ko.observable(defaultSortField);
         self.sortDirection = ko.observable(defaultSortDirection);
 
@@ -296,7 +297,7 @@
             }).always(function() {
                 setTimeout(function() {
                     model.sendingBulkRequest(false);
-                }, 1000);
+                }, 1500);
             });
         }
 
@@ -476,8 +477,10 @@
             if (self.selectedTask()) {
                 if (self.selectedTask().isRunning()) {
                     return "{{ trans('texts.stop') }}";
-                } else {
+                } else if (self.selectedTask().seconds() > 0) {
                     return "{{ trans('texts.resume') }}";
+                } else {
+                    return "{{ trans('texts.start') }}";
                 }
             } else {
                 return "{{ trans('texts.start') }}";
@@ -519,7 +522,7 @@
             var tasks = self.tasks();
 
             var filtered = ko.utils.arrayFilter(tasks, function(task) {
-                return task.matchesFilter(self.filter(), self.filterState());
+                return task.matchesFilter(self.filter(), self.filterState(), self.filterStatusId());
             });
 
             if (! self.filter() || filtered.length > 0) {
@@ -602,6 +605,7 @@
         self.project = ko.observable();
         self.isHovered = ko.observable(false);
         self.created_at = ko.observable(moment.utc().format('YYYY-MM-DD HH:mm:ss'));
+        self.task_status_id = ko.observable();
 
         self.mapping = {
             'client': {
@@ -753,7 +757,7 @@
             }).always(function() {
                 setTimeout(function() {
                     model.sendingRequest(false);
-                }, 1000);
+                }, 1500);
             });
         }
 
@@ -767,6 +771,9 @@
             }
             if (! self.isRunning()) {
                 self.addTime();
+            }
+            if (data.task_status) {
+                self.task_status_id(data.task_status.public_id);
             }
 
             // Trigger isChanged to update
@@ -928,7 +935,7 @@
             return times;
         }
 
-        self.matchesFilter = function(filter, filterState) {
+        self.matchesFilter = function(filter, filterState, filterStatusId) {
             if (filter) {
                 filter = model.filter().toLowerCase();
                 var parts = filter.split(' ');
@@ -962,6 +969,12 @@
                 return false;
             } else if (filterState == 'running' && ! self.isRunning()) {
                 return false;
+            }
+
+            if (filterStatusId) {
+                if (self.task_status_id() != filterStatusId) {
+                    return false;
+                }
             }
 
             return true;
@@ -1157,7 +1170,7 @@
             if (self.contacts().length == 0) return;
             var contact = self.contacts()[0];
             if (contact.first_name() || contact.last_name()) {
-                return contact.first_name() + ' ' + contact.last_name();
+                return (contact.first_name() || '') + ' ' + (contact.last_name() || '');
             } else {
                 return contact.email();
             }

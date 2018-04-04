@@ -58,7 +58,7 @@ class AccountPresenter extends Presenter
      */
     public function taskRate()
     {
-        if ($this->entity->task_rate) {
+        if (floatval($this->entity->task_rate)) {
             return Utils::roundSignificant($this->entity->task_rate);
         } else {
             return '';
@@ -208,7 +208,7 @@ class AccountPresenter extends Presenter
 
         foreach ($fields as $key => $val) {
             if ($this->$key) {
-                $data[$this->$key] = [
+                $data[Utils::getCustomLabel($this->$key)] = [
                     'value' => $val,
                     'name' => $val,
                 ];
@@ -247,9 +247,9 @@ class AccountPresenter extends Presenter
             $url .= $account->subdomain ?: 'app';
             $url .= '.' . Domain::getDomainFromId($account->domain_id);
         } else {
-            $url = SITE_URL;
+            $url = trim(SITE_URL, '/');
         }
-        
+
         $url .= '/client/login';
 
         if (Utils::isNinja()) {
@@ -264,4 +264,56 @@ class AccountPresenter extends Presenter
 
         return $url;
     }
+
+
+    public function customClientLabel1()
+    {
+        return Utils::getCustomLabel($this->entity->custom_client_label1);
+    }
+
+    public function customClientLabel2()
+    {
+        return Utils::getCustomLabel($this->entity->custom_client_label2);
+    }
+
+    public function customContactLabel1()
+    {
+        return Utils::getCustomLabel($this->entity->custom_contact_label1);
+    }
+
+    public function customContactLabel2()
+    {
+        return Utils::getCustomLabel($this->entity->custom_contact_label2);
+    }
+
+    public function customInvoiceLabel1()
+    {
+        return Utils::getCustomLabel($this->entity->custom_invoice_label1);
+    }
+
+    public function customInvoiceLabel2()
+    {
+        return Utils::getCustomLabel($this->entity->custom_invoice_label2);
+    }
+
+    public function customInvoiceTextLabel1()
+    {
+        return Utils::getCustomLabel($this->entity->custom_invoice_text_label1);
+    }
+
+    public function customInvoiceTextLabel2()
+    {
+        return Utils::getCustomLabel($this->entity->custom_invoice_text_label1);
+    }
+
+    public function customProductLabel1()
+    {
+        return Utils::getCustomLabel($this->entity->custom_invoice_item_label1);
+    }
+
+    public function customProductLabel2()
+    {
+        return Utils::getCustomLabel($this->entity->custom_invoice_item_label2);
+    }
+
 }

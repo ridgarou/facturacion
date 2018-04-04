@@ -2,6 +2,8 @@
 
 namespace App\Models\Traits;
 
+use Utils;
+
 /**
  * Class PresentsInvoice.
  */
@@ -186,6 +188,7 @@ trait PresentsInvoice
                 'product.custom_value2',
                 'product.unit_cost',
                 'product.quantity',
+                'product.discount',
                 'product.tax',
                 'product.line_total',
             ],
@@ -196,6 +199,7 @@ trait PresentsInvoice
                 'product.custom_value2',
                 'product.rate',
                 'product.hours',
+                'product.discount',
                 'product.tax',
                 'product.line_total',
             ],
@@ -332,6 +336,7 @@ trait PresentsInvoice
             'custom_value1',
             'custom_value2',
             'delivery_note',
+            'date',
         ];
 
         foreach ($fields as $field) {
@@ -360,7 +365,7 @@ trait PresentsInvoice
             'product.custom_value1' => 'custom_invoice_item_label1',
             'product.custom_value2' => 'custom_invoice_item_label2',
         ] as $field => $property) {
-            $data[$field] = e($this->$property) ?: trans('texts.custom_field');
+            $data[$field] = e(Utils::getCustomLabel($this->$property)) ?: trans('texts.custom_field');
         }
 
         return $data;
@@ -378,9 +383,9 @@ trait PresentsInvoice
         return null;
     }
 
-    public function hideQuantity() {
+    public function hasInvoiceField($type, $field) {
         $fields = $this->getInvoiceFields();
 
-        return ! isset($fields['product_fields']['product.quantity']);
+        return isset($fields[$type . '_fields'][$field]);
     }
 }

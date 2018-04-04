@@ -71,7 +71,7 @@ class HandleUserLoggedIn
 
         // if they're using Stripe make sure they're using Stripe.js
         $accountGateway = $account->getGatewayConfig(GATEWAY_STRIPE);
-        if ($accountGateway && ! $accountGateway->getPublishableStripeKey()) {
+        if ($accountGateway && ! $accountGateway->getPublishableKey()) {
             Session::flash('warning', trans('texts.missing_publishable_key'));
         } elseif ($account->isLogoTooLarge()) {
             Session::flash('warning', trans('texts.logo_too_large', ['size' => $account->getLogoSize() . 'KB']));
@@ -102,7 +102,7 @@ class HandleUserLoggedIn
             if (in_array(config('app.key'), ['SomeRandomString', 'SomeRandomStringSomeRandomString', 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'])) {
                 Session::flash('error', trans('texts.error_app_key_set_to_default'));
             } elseif (in_array($appCipher, ['MCRYPT_RIJNDAEL_256', 'MCRYPT_RIJNDAEL_128'])) {
-                Session::flash('error', trans('texts.mcrypt_warning'));
+                Session::flash('error', trans('texts.mcrypt_warning', ['command' => '<code>php artisan ninja:update-key --legacy=true</code>']));
             }
         }
     }

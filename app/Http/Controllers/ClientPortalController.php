@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Events\InvoiceInvitationWasViewed;
 use App\Events\QuoteInvitationWasViewed;
+use App\Models\Account;
 use App\Models\Contact;
 use App\Models\Document;
 use App\Models\Gateway;
@@ -55,7 +56,7 @@ class ClientPortalController extends BaseController
         $this->taskRepo = $taskRepo;
     }
 
-    public function view($invitationKey)
+    public function viewInvoice($invitationKey)
     {
         if (! $invitation = $this->invoiceRepo->findInvoiceByInvitation($invitationKey)) {
             return $this->returnError();
@@ -75,8 +76,6 @@ class ClientPortalController extends BaseController
                 'error' => trans('texts.invoice_not_found'),
             ]);
         }
-
-        $account->loadLocalizationSettings($client);
 
         if (! Input::has('phantomjs') && ! session('silent:' . $client->id) && ! Session::has($invitation->invitation_key)
             && (! Auth::check() || Auth::user()->account_id != $invoice->account_id)) {
@@ -111,14 +110,17 @@ class ClientPortalController extends BaseController
             'last_name',
             'email',
             'phone',
+            'custom_value1',
+            'custom_value2',
         ]);
+        $account->load(['date_format', 'datetime_format']);
 
         // translate the country names
         if ($invoice->client->country) {
-            $invoice->client->country->name = trans('texts.country_' . $invoice->client->country->name);
+            $invoice->client->country->name = $invoice->client->country->getName();
         }
         if ($invoice->account->country) {
-            $invoice->account->country->name = trans('texts.country_' . $invoice->account->country->name);
+            $invoice->account->country->name = $invoice->account->country->getName();
         }
 
         $data = [];
@@ -224,7 +226,7 @@ class ClientPortalController extends BaseController
         return $pdfString;
     }
 
-    public function sign($invitationKey)
+    public function authorizeInvoice($invitationKey)
     {
         if (! $invitation = $this->invoiceRepo->findInvoiceByInvitation($invitationKey)) {
             return RESULT_FAILURE;
@@ -260,13 +262,13 @@ class ClientPortalController extends BaseController
             return redirect(request()->url());
         }
 
-        $account->loadLocalizationSettings($client);
         $color = $account->primary_color ? $account->primary_color : '#0b4d78';
         $customer = false;
 
         if (! $account->enable_client_portal) {
             return $this->returnError();
         } elseif (! $account->enable_client_portal_dashboard) {
+            session()->reflash();
             return redirect()->to('/client/invoices/');
         }
 
@@ -332,7 +334,6 @@ class ClientPortalController extends BaseController
         }
 
         $account = $contact->account;
-        $account->loadLocalizationSettings($contact->client);
 
         if (! $account->enable_client_portal) {
             return $this->returnError();
@@ -366,7 +367,6 @@ class ClientPortalController extends BaseController
         }
 
         $account = $contact->account;
-        $account->loadLocalizationSettings($contact->client);
 
         if (! $account->enable_client_portal) {
             return $this->returnError();
@@ -412,7 +412,6 @@ class ClientPortalController extends BaseController
         }
 
         $account = $contact->account;
-        $account->loadLocalizationSettings($contact->client);
 
         if (! $account->enable_client_portal) {
             return $this->returnError();
@@ -497,7 +496,6 @@ class ClientPortalController extends BaseController
         }
 
         $account = $contact->account;
-        $account->loadLocalizationSettings($contact->client);
 
         if (! $account->enable_client_portal) {
             return $this->returnError();
@@ -533,7 +531,6 @@ class ClientPortalController extends BaseController
         }
 
         $account = $contact->account;
-        $account->loadLocalizationSettings($contact->client);
 
         if (! $account->enable_client_portal) {
             return $this->returnError();
@@ -569,7 +566,6 @@ class ClientPortalController extends BaseController
         }
 
         $account = $contact->account;
-        $account->loadLocalizationSettings($contact->client);
 
         if (! $contact->client->show_tasks_in_portal) {
             return redirect()->to($account->enable_client_portal_dashboard ? '/client/dashboard' : '/client/payment_methods/');
@@ -609,7 +605,6 @@ class ClientPortalController extends BaseController
         }
 
         $account = $contact->account;
-        $account->loadLocalizationSettings($contact->client);
 
         if (! $account->enable_client_portal) {
             return $this->returnError();
@@ -959,5 +954,66 @@ class ClientPortalController extends BaseController
         }
 
         return Redirect::to('client/invoices/recurring');
+    }
+
+    public function showDetails()
+    {
+        if (! $contact = $this->getContact()) {
+            return $this->returnError();
+        }
+
+        $data = [
+            'contact' => $contact,
+            'client' => $contact->client,
+            'account' => $contact->account,
+        ];
+
+        return view('invited.details', $data);
+    }
+
+    public function updateDetails(\Illuminate\Http\Request $request)
+    {
+        if (! $contact = $this->getContact()) {
+            return $this->returnError();
+        }
+
+        $client = $contact->client;
+        $account = $contact->account;
+
+        if (! $account->enable_client_portal) {
+            return $this->returnError();
+        }
+
+        $rules = [
+            'email' => 'required',
+            'address1' => 'required',
+            'city' => 'required',
+            'state' => $account->requiresAddressState() ? 'required' : '',
+            'postal_code' => 'required',
+            'country_id' => 'required',
+        ];
+
+        if ($client->name) {
+            $rules['name'] = 'required';
+        } else {
+            $rules['first_name'] = 'required';
+            $rules['last_name'] = 'required';
+        }
+        if ($account->vat_number || $account->isNinjaAccount()) {
+            $rules['vat_number'] = 'required';
+        }
+
+        $this->validate($request, $rules);
+
+        $contact->fill(request()->all());
+        $contact->save();
+
+        $client->fill(request()->all());
+        $client->save();
+
+        event(new \App\Events\ClientWasUpdated($client));
+
+        return redirect($account->enable_client_portal_dashboard ? '/client/dashboard' : '/client/payment_methods')
+            ->withMessage(trans('texts.updated_client_details'));
     }
 }

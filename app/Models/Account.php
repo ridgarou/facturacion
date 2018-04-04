@@ -108,6 +108,7 @@ class Account extends Eloquent
         'enable_reminder1',
         'enable_reminder2',
         'enable_reminder3',
+        'enable_reminder4',
         'num_days_reminder1',
         'num_days_reminder2',
         'num_days_reminder3',
@@ -133,6 +134,9 @@ class Account extends Eloquent
         'header_font_id',
         'body_font_id',
         'auto_convert_quote',
+        'auto_archive_quote',
+        'auto_archive_invoice',
+        'auto_email_invoice',
         'all_pages_footer',
         'all_pages_header',
         'show_currency_code',
@@ -145,6 +149,7 @@ class Account extends Eloquent
         'invoice_fields',
         'invoice_embed_documents',
         'document_email_attachment',
+        'ubl_email_attachment',
         'enable_client_portal_dashboard',
         'page_size',
         'live_preview',
@@ -168,6 +173,7 @@ class Account extends Eloquent
         'reset_counter_frequency_id',
         'payment_type_id',
         'gateway_fee_enabled',
+        'send_item_details',
         'reset_counter_date',
         'custom_contact_label1',
         'custom_contact_label2',
@@ -178,6 +184,8 @@ class Account extends Eloquent
         'credit_number_pattern',
         'task_rate',
         'inclusive_taxes',
+        'convert_products',
+        'signature_on_pdf',
     ];
 
     /**
@@ -228,12 +236,15 @@ class Account extends Eloquent
     public static $customLabels = [
         'balance_due',
         'credit_card',
+        'delivery_note',
         'description',
         'discount',
         'due_date',
         'hours',
         'id_number',
         'invoice',
+        'invoice_date',
+        'invoice_number',
         'item',
         'line_total',
         'outstanding',
@@ -242,12 +253,15 @@ class Account extends Eloquent
         'po_number',
         'quantity',
         'quote',
+        'quote_date',
+        'quote_number',
         'rate',
         'service',
         'subtotal',
         'tax',
         'terms',
         'unit_cost',
+        'valid_until',
         'vat_number',
     ];
 
@@ -497,7 +511,7 @@ class Account extends Eloquent
         if ($gatewayId) {
             return $this->getGatewayConfig($gatewayId) != false;
         } else {
-            return count($this->account_gateways) > 0;
+            return $this->account_gateways->count() > 0;
         }
     }
 
@@ -616,12 +630,12 @@ class Account extends Eloquent
      *
      * @return DateTime|null|string
      */
-    public function getDateTime($date = 'now')
+    public function getDateTime($date = 'now', $formatted = false)
     {
         $date = $this->getDate($date);
         $date->setTimeZone(new \DateTimeZone($this->getTimezone()));
 
-        return $date;
+        return $formatted ? $date->format($this->getCustomDateTimeFormat()) : $date;
     }
 
     /**
@@ -672,6 +686,17 @@ class Account extends Eloquent
         }
 
         return Utils::formatMoney($amount, $currencyId, $countryId, $decorator);
+    }
+
+    public function formatNumber($amount, $precision = 0)
+    {
+        if ($this->currency_id) {
+            $currencyId = $this->currency_id;
+        } else {
+            $currencyId = DEFAULT_CURRENCY;
+        }
+
+        return Utils::formatNumber($amount, $currencyId, $precision);
     }
 
     /**
@@ -1016,7 +1041,7 @@ class Account extends Eloquent
             return false;
         }
 
-        return $this->enable_reminder1 || $this->enable_reminder2 || $this->enable_reminder3;
+        return $this->enable_reminder1 || $this->enable_reminder2 || $this->enable_reminder3 || $this->enable_reminder4;
     }
 
     /**
@@ -1045,9 +1070,8 @@ class Account extends Eloquent
             // Pro
             case FEATURE_TASKS:
             case FEATURE_EXPENSES:
-                if (Utils::isNinja() && $this->company_id < EXTRAS_GRANDFATHER_COMPANY_ID) {
-                    return true;
-                }
+            case FEATURE_QUOTES:
+                return true;
 
             case FEATURE_CUSTOMIZE_INVOICE_DESIGN:
             case FEATURE_DIFFERENT_DESIGNS:
@@ -1056,7 +1080,6 @@ class Account extends Eloquent
             case FEATURE_CUSTOM_EMAILS:
             case FEATURE_PDF_ATTACHMENT:
             case FEATURE_MORE_INVOICE_DESIGNS:
-            case FEATURE_QUOTES:
             case FEATURE_REPORTS:
             case FEATURE_BUY_NOW_BUTTONS:
             case FEATURE_API:
@@ -1098,7 +1121,7 @@ class Account extends Eloquent
 
     public function isPaid()
     {
-        return Utils::isNinja() ? $this->isPro() : Utils::isWhiteLabel();
+        return Utils::isNinja() ? ($this->isPro() && ! $this->isTrial()) : Utils::isWhiteLabel();
     }
 
     /**
@@ -1322,6 +1345,8 @@ class Account extends Eloquent
                 'paid_to_date',
                 'invoices',
                 'contacts',
+                'currency_id',
+                'currency',
             ]);
 
             foreach ($client->invoices as $invoice) {
@@ -1335,6 +1360,8 @@ class Account extends Eloquent
                     'created_at',
                     'is_recurring',
                     'invoice_type_id',
+                    'is_public',
+                    'due_date',
                 ]);
 
                 foreach ($invoice->invoice_items as $invoiceItem) {
@@ -1342,6 +1369,7 @@ class Account extends Eloquent
                         'product_key',
                         'cost',
                         'qty',
+                        'discount',
                     ]);
                 }
             }
@@ -1415,7 +1443,7 @@ class Account extends Eloquent
      */
     public function getSiteUrl()
     {
-        $url = SITE_URL;
+        $url = trim(SITE_URL, '/');
         $iframe_url = $this->iframe_url;
 
         if ($iframe_url) {
@@ -1476,6 +1504,14 @@ class Account extends Eloquent
     public function attachPDF()
     {
         return $this->hasFeature(FEATURE_PDF_ATTACHMENT) && $this->pdf_email_attachment;
+    }
+
+    /**
+     * @return bool
+     */
+    public function attachUBL()
+    {
+        return $this->hasFeature(FEATURE_PDF_ATTACHMENT) && $this->ubl_email_attachment;
     }
 
     /**
@@ -1637,6 +1673,7 @@ class Account extends Eloquent
             ENTITY_EXPENSE,
             ENTITY_VENDOR,
             ENTITY_PROJECT,
+            ENTITY_PROPOSAL,
         ])) {
             return true;
         }
@@ -1645,6 +1682,8 @@ class Account extends Eloquent
             $entityType = ENTITY_EXPENSE;
         } elseif ($entityType == ENTITY_PROJECT) {
             $entityType = ENTITY_TASK;
+        } elseif ($entityType == ENTITY_PROPOSAL) {
+            $entityType = ENTITY_QUOTE;
         }
 
         // note: single & checks bitmask match
@@ -1757,6 +1796,11 @@ class Account extends Eloquent
         } else {
             return url('/');
         }
+    }
+
+    public function requiresAddressState() {
+        return true;
+        //return ! $this->country_id || $this->country_id == DEFAULT_COUNTRY;
     }
 }
 

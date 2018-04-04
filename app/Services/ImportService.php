@@ -393,12 +393,14 @@ class ImportService
             }
         }
 
+        /*
         // if the invoice number is blank we'll assign it
         if ($entityType == ENTITY_INVOICE && ! $data['invoice_number']) {
             $account = Auth::user()->account;
             $invoice = Invoice::createNew();
             $data['invoice_number'] = $account->getNextNumber($invoice);
         }
+        */
 
         if (EntityModel::validate($data, $entityType) !== true) {
             return false;
@@ -947,7 +949,7 @@ class ImportService
             $this->maps['client'][$name] = $client->id;
             $this->maps['client_ids'][$client->public_id] = $client->id;
         }
-        if (count($client->contacts) && $name = strtolower(trim($client->contacts[0]->email))) {
+        if ($client->contacts->count() && $name = strtolower(trim($client->contacts[0]->email))) {
             $this->maps['client'][$name] = $client->id;
             $this->maps['client_ids'][$client->public_id] = $client->id;
         }
