@@ -13,6 +13,7 @@
 /bootstrap/compiled.php
 /bootstrap/environment.php
 /vendor
+/vendor.bck
 /node_modules
 /.DS_Store
 Thumbs.db
