@@ -4,8 +4,13 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
         "This file is @generated automatically"
     ],
+    "hash": "81ec40f578917feb6070a8c9911bf69c",
+    "content-hash": "ad55e995b8e9255f3319e3b3ae1200e5",
+    "packages": [
+        {
             "name": "abdala/omnipay-pagseguro",
             "version": "0.2.0",
+            "source": {
                 "type": "git",
                 "url": "https://github.com/abdala/omnipay-pagseguro.git",
                 "reference": "da53d77eccc4c0c4e24d6df825cbae4e0944f9dc"
