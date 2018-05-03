@@ -436,14 +436,12 @@ class Utils
 
     public static function prepareErrorData($context)
     {
-        return [
+        $data = [
             'context' => $context,
             'user_id' => Auth::check() ? Auth::user()->id : 0,
             'account_id' => Auth::check() ? Auth::user()->account_id : 0,
             'user_name' => Auth::check() ? Auth::user()->getDisplayName() : '',
             'method' => Request::method(),
-            'url' => Input::get('url', Request::url()),
-            'previous' => url()->previous(),
             'user_agent' => isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '',
             'locale' => App::getLocale(),
             'ip' => Request::getClientIp(),
@@ -452,6 +450,15 @@ class Utils
             'is_api' => session('token_id') ? 'yes' : 'no',
             'db_server' => config('database.default'),
         ];
+
+        if (static::isNinja()) {
+            $data['url'] = Input::get('url', Request::url());
+            $data['previous'] = url()->previous();
+        } else {
+            $data['url'] = request()->path();
+        }
+
+        return $data;
     }
 
     public static function getErrors()
@@ -492,6 +499,21 @@ class Utils
         $value = preg_replace('/[^0-9]/', '', $value);
 
         return intval($value);
+    }
+
+    public static function lookupIdInCache($name, $type)
+    {
+        $cache = Cache::get($type);
+
+        $data = $cache->filter(function ($item) use ($name) {
+            return strtolower($item->name) == trim(strtolower($name));
+        });
+
+        if ($record = $data->first()) {
+            return $record->id;
+        } else {
+            return null;
+        }
     }
 
     public static function getFromCache($id, $type)
